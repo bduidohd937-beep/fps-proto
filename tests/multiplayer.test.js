@@ -43,8 +43,8 @@ test('two clients can create, join, shoot, reject third player and disconnect',a
  const health=await (await fetch(url+'/api/health')).json();
  assert.equal(health.ok,true);
  assert.equal(health.service,'project-duel');
- assert.equal(health.protocol,3);
- assert.equal(health.version,'0.2.2');
+ assert.equal(health.protocol,4);
+ assert.equal(health.version,'0.2.3');
  const one=io(url,{transports:['websocket'],reconnection:false});
  clients.push(one);
  await waitFor(one,'connect');
@@ -84,6 +84,38 @@ test('two clients can create, join, shoot, reject third player and disconnect',a
  const fired=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.ammo===23);
  one.emit('player:fire');
  assert.equal((await fired).players.find(p=>p.id===one.id).ammo,23);
+ // Server rejects nonexistent weapons, and authoritative selection propagates to peers.
+ const wrong=new Promise((resolve,reject)=>one.timeout(4000).emit('player:select-weapon','HACKED',(err,ack)=>err?reject(err):resolve(ack)));
+ assert.equal((await wrong).ok,false);
+ const switched=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.weaponId==='VXR9');
+ const selected=new Promise((resolve,reject)=>one.timeout(4000).emit('player:select-weapon','VXR9',(err,ack)=>err?reject(err):resolve(ack)));
+ assert.equal((await selected).ok,true);
+ const smg=await switched;
+ assert.equal(smg.players.find(p=>p.id===one.id).ammo,36);
+ const aimState=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.ads===true);
+ one.emit('player:input',{yaw:-Math.PI/2,pitch:0,forward:0,strafe:0,sprint:false,jump:false,crouch:false,ads:true});
+ assert.equal((await aimState).players.find(p=>p.id===one.id).ads,true);
+ await delay(330); // switch animation is enforced by the server
+ const smgShot=waitFor(one,'match:shot',shot=>shot.shooterId===one.id&&shot.weaponId==='VXR9');
+ const smgAmmo=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.ammo===35);
+ one.emit('player:fire');
+ assert.equal((await smgShot).weaponId,'VXR9');
+ assert.equal((await smgAmmo).players.find(p=>p.id===one.id).ammo,35);
+ const reloadingSmg=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.reloadAt>Date.now());
+ one.emit('player:reload');
+ assert.ok((await reloadingSmg).players.find(p=>p.id===one.id).reloadAt>Date.now());
+ const rifleState=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.weaponId==='AR4');
+ one.emit('player:select-weapon','AR4');
+ assert.equal((await rifleState).players.find(p=>p.id===one.id).ammo,23);
+ const smgAgain=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.weaponId==='VXR9');
+ one.emit('player:select-weapon','VXR9');
+ assert.equal((await smgAgain).players.find(p=>p.id===one.id).ammo,35);
+ const sniperState=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.weaponId==='MKR12');
+ one.emit('player:select-weapon','MKR12');
+ assert.equal((await sniperState).players.find(p=>p.id===one.id).ammo,5);
+ const battleState=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.weaponId==='BR7');
+ one.emit('player:select-weapon','BR7');
+ assert.equal((await battleState).players.find(p=>p.id===one.id).ammo,16);
  // Live server physics must expose the same airborne state to BOTH clients.
  const jumping=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.y>.1);
  const peerSeesJump=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.y>.1);
