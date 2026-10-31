@@ -71,3 +71,9 @@
 .graphics-option select{color:#d3f3ff;background:#17293c;border:1px solid #46657d;border-radius:6px;padding:7px 10px;outline:none}
 .graphics-option select:focus-visible{border-color:#55c8eb}
 @media(max-width:720px){.graphics-option{justify-content:flex-start}}
+
+/* FRONTLINE V0.2.2 movement telemetry; unobtrusive in 1v1 firefights. */
+.movement-status{position:absolute;left:50%;bottom:29px;transform:translateX(-50%);display:flex;gap:9px;pointer-events:none;font-size:11px;letter-spacing:.5px}
+.movement-status span{border:1px solid #69838d80;border-radius:4px;background:#0c1d29bf;color:#c9ebee;padding:5px 10px;backdrop-filter:blur(3px)}
+.aim-hint{top:61%;max-width:90vw;white-space:normal}
+@media(max-width:720px){.movement-status{bottom:96px}.aim-hint{font-size:10px}}
