@@ -5,7 +5,7 @@ import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {Server} from 'socket.io';
-import {MAX_HP,MAX_AMMO,RELOAD_MS,FIRE_COOLDOWN_MS,DAMAGE,KILLS_TO_WIN,RESPAWN_MS,SPAWNS,clamp,movePlayer,shotHitsPlayer} from '../shared/rules.js';
+import {MAX_HP,MAX_AMMO,RELOAD_MS,FIRE_COOLDOWN_MS,DAMAGE,KILLS_TO_WIN,RESPAWN_MS,SPAWNS,clamp,movePlayer3D,shotHitsPlayer} from '../shared/rules.js';
 
 const app=express(),server=http.createServer(app);
 const io=new Server(server,{maxHttpBufferSize:8192});
@@ -13,8 +13,8 @@ const rooms=new Map(),socketRooms=new Map();
 const ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TICK_MS=1000/30, SNAPSHOT_EVERY=2;
 const GAME_SERVICE = 'project-duel';
-const GAME_PROTOCOL = 2;
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:GAME_SERVICE,protocol:GAME_PROTOCOL,version:'0.1.3',rooms:rooms.size}));
+const GAME_PROTOCOL = 3;
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:GAME_SERVICE,protocol:GAME_PROTOCOL,version:'0.2.2',rooms:rooms.size}));
 const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 if(existsSync(dist)){
  app.use(express.static(dist));
@@ -26,14 +26,14 @@ function roomCode(){
 }
 function newPlayer(socket,index){
  const spawn=SPAWNS[index];
- return {id:socket.id,name:index===0?'BLUE':'RED',x:spawn.x,z:spawn.z,yaw:spawn.yaw,pitch:0,
+ return {id:socket.id,name:index===0?'BLUE':'RED',x:spawn.x,y:spawn.y,z:spawn.z,vy:0,grounded:true,crouch:false,jumpHeld:false,yaw:spawn.yaw,pitch:0,
   hp:MAX_HP,ammo:MAX_AMMO,kills:0,deaths:0,respawnAt:0,reloadAt:0,lastFireAt:0,
-  input:{forward:0,strafe:0,sprint:false},lastInputAt:Date.now()};
+  input:{forward:0,strafe:0,sprint:false,jump:false,crouch:false},lastInputAt:Date.now()};
 }
 function publicState(room){
  return {code:room.code,status:room.status,winnerId:room.winnerId,serverNow:Date.now(),targetKills:KILLS_TO_WIN,
-  players:room.players.map(({id,name,x,z,yaw,pitch,hp,ammo,kills,deaths,respawnAt,reloadAt})=>
-   ({id,name,x,z,yaw,pitch,hp,ammo,kills,deaths,respawnAt,reloadAt}))};
+  players:room.players.map(({id,name,x,y,z,vy,grounded,crouch,yaw,pitch,hp,ammo,kills,deaths,respawnAt,reloadAt})=>
+   ({id,name,x,y,z,vy,grounded,crouch,yaw,pitch,hp,ammo,kills,deaths,respawnAt,reloadAt}))};
 }
 function broadcast(room){io.to(room.code).emit('match:state',publicState(room));}
 function resetMatch(room){
@@ -86,7 +86,7 @@ io.on('connection',socket=>{
   if(!Number.isFinite(data.yaw)||!Number.isFinite(data.pitch))return;
   player.yaw=clamp(data.yaw,-100000,100000);
   player.pitch=clamp(data.pitch,-Math.PI/2+.05,Math.PI/2-.05);
-  player.input={forward:clamp(Number(data.forward)||0,-1,1),strafe:clamp(Number(data.strafe)||0,-1,1),sprint:data.sprint===true};
+  player.input={forward:clamp(Number(data.forward)||0,-1,1),strafe:clamp(Number(data.strafe)||0,-1,1),sprint:data.sprint===true,jump:data.jump===true,crouch:data.crouch===true};
   player.lastInputAt=Date.now();
  });
  socket.on('player:reload',()=>{
@@ -129,12 +129,15 @@ const ticker=setInterval(()=>{
    if(player.reloadAt&&now>=player.reloadAt){player.ammo=MAX_AMMO;player.reloadAt=0;}
    if(!player.hp&&player.respawnAt&&now>=player.respawnAt){
     const spawn=SPAWNS[room.players.indexOf(player)];
-    Object.assign(player,{x:spawn.x,z:spawn.z,yaw:spawn.yaw,pitch:0,hp:MAX_HP,ammo:MAX_AMMO,
-      respawnAt:0,reloadAt:0,input:{forward:0,strafe:0,sprint:false}});
-    io.to(player.id).emit('player:respawn',{yaw:spawn.yaw});
+    Object.assign(player,{x:spawn.x,y:spawn.y,z:spawn.z,vy:0,grounded:true,crouch:false,jumpHeld:false,yaw:spawn.yaw,pitch:0,hp:MAX_HP,ammo:MAX_AMMO,
+      respawnAt:0,reloadAt:0,input:{forward:0,strafe:0,sprint:false,jump:false,crouch:false}});
+    io.to(player.id).emit('player:respawn',{x:spawn.x,y:spawn.y,z:spawn.z,yaw:spawn.yaw});
    }
-   if(player.hp>0&&now-player.lastInputAt<300)
-     Object.assign(player,movePlayer(player,{...player.input,yaw:player.yaw},dt));
+   if(player.hp>0){
+    const fresh=now-player.lastInputAt<300;
+    const input=fresh?player.input:{forward:0,strafe:0,sprint:false,jump:false,crouch:player.input.crouch};
+    Object.assign(player,movePlayer3D(player,{...input,yaw:player.yaw},dt));
+   }
   }
   if(tickCount%SNAPSHOT_EVERY===0)broadcast(room);
  }
@@ -145,4 +148,4 @@ server.on('error',error=>{
  console.error('PROJECT DUEL server startup failed:',error.code||error.message);
  process.exitCode=1;
 });
-server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL V0.1.3 game server on port '+PORT));
+server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL FRONTLINE V0.2.2 game server on port '+PORT));
