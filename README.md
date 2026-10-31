@@ -1,4 +1,4 @@
-# PROJECT DUEL — 온라인 1대1 3D FPS V0.1
+# PROJECT DUEL — 온라인 1대1 3D FPS V0.1.2
 
 브라우저 링크와 6자리 초대 코드를 공유해 친구와 실시간으로 대결하는 FPS 프로토타입입니다. PC 두 대로 플레이하는 것을 권장합니다.
 
@@ -18,13 +18,17 @@ Node.js 20 이상 필요.
     npm run dev
 
 브라우저에서 http://localhost:5173 접속.
-Vite 개발 서버가 Socket.IO 연결을 localhost:3001(Node 서버)로 프록시합니다.
+Vite 개발 서버가 Socket.IO와 `/api/health` 요청을 전용 게임 포트 `localhost:43171`(Node 서버)로 프록시합니다. 이전 3001번 포트의 다른 서버에 잘못 연결되는 문제를 방지하기 위한 설정입니다.
+
+`http://localhost:43171/api/health` 에 접속하면 `service: project-duel`, `protocol: 2`, `version: 0.1.2`가 포함된 JSON이 보여야 합니다.
+
+**전장 생성이 안 되면** 노트북의 기존 `npm run dev`를 `Ctrl+C`로 중지하고 `git pull --ff-only origin feat/online-fps-mvp-v0.1` 후 `npm run dev`를 다시 실행하세요. 개발 서버를 재시작해야 Vite 프록시 포트 변경이 적용됩니다. 포트가 이미 사용 중이면 해당 프로세스를 확인하세요.
 
     npm run check   # 규칙 테스트와 웹 빌드
     npm run build
     npm run start   # dist 웹 클라이언트 + 온라인 서버
 
-npm start 기본 포트는 3001이며 PORT 환경변수로 변경할 수 있습니다.
+npm start 기본 포트는 43171이며 Render 등에서는 `PORT` 환경변수로 변경됩니다. 로컬에서는 `GAME_PORT`로 서버/Vite 프록시 포트를 함께 변경할 수 있습니다.
 
 ## 원격 친구 대전
 
