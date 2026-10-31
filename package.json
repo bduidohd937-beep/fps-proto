@@ -1,6 +1,6 @@
 {
   "name": "project-duel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "build": "vite build",
     "start": "node server/index.js",
     "test": "node --test tests/*.test.js",
-    "check": "npm run test && npm run build"
+    "check": "npm run test && npm run build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@react-three/fiber": "^9.1.2",
@@ -25,7 +26,8 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
-    "vite": "^6.3.3"
+    "vite": "^6.3.3",
+    "@playwright/test": "^1.55.0"
   },
   "engines": {
     "node": ">=20"
