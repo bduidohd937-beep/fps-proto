@@ -18,7 +18,26 @@ export default function App(){
  const lastHp=useRef(null);
  useEffect(()=>{
   const socket=io({reconnectionAttempts:10});socketRef.current=socket;
-  socket.on('connect',()=>{setConnected(true);setMessage('');});
+  socket.on('connect',async ()=>{
+   setConnected(false);
+   setMessage('PROJECT DUEL 서버 버전을 확인하고 있습니다...');
+   const controller=new AbortController();
+   const timeout=setTimeout(()=>controller.abort(),5000);
+   try{
+    const response=await fetch('/api/health',{cache:'no-store',signal:controller.signal});
+    const info=await response.json();
+    if(!response.ok||info.service!=='project-duel'||info.protocol!==2){
+     setMessage('연결된 서버가 PROJECT DUEL V0.1.2 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
+     return;
+    }
+    if(!socket.connected)return;
+    setConnected(true);setMessage('');
+   }catch{
+    if(socket.connected)setMessage('게임 서버 상태 확인에 실패했습니다. 기존 서버를 종료하고 npm run dev를 다시 실행해 주세요.');
+   }finally{
+    clearTimeout(timeout);
+   }
+  });
   socket.on('connect_error',()=>{
    setConnected(false);setRoomPending('');
    setMessage('게임 서버에 연결할 수 없습니다. 서버 실행 상태를 확인해 주세요.');
@@ -58,7 +77,7 @@ export default function App(){
  },[]);
  const requestRoom=(action,code)=>{
   const socket=socketRef.current;
-  if(!socket?.connected)return setMessage('게임 서버 연결이 끊겼습니다. 서버 실행 상태를 확인해 주세요.');
+  if(!socket?.connected||!connected)return setMessage('PROJECT DUEL 서버 연결이 확인되지 않았습니다. 개발 서버를 재시작해 주세요.');
   if(roomPending)return;
   setRoomPending(action);
   setMessage(action==='create'?'전장 생성 요청을 서버에 전송 중입니다...':'초대 코드 확인 및 입장 요청 중입니다...');
@@ -114,7 +133,7 @@ export default function App(){
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.1</div>
+   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.2</div>
    <h1>PROJECT <span className="glow">DUEL</span></h1>
    <p className="subtitle">친구와 단둘이. 단 하나의 승자. 설치 없는 3D FPS.</p>
    <div className="lobby-grid">
