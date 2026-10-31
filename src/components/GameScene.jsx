@@ -4,6 +4,7 @@ import {Vector3,Group,Mesh,BoxGeometry,MeshStandardMaterial} from 'three';
 import {PLAYER_EYE,CROUCH_EYE,movePlayer3D} from '../../shared/rules.js';
 import {smoothingFactor,shortestAngleDelta} from '../game/renderSmoothing.js';
 import {FrontlineArena} from './FrontlineArena.jsx';
+import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../shared/weapons.js';
 
 const QUALITY_DPR={low:[.75,1],balanced:[1,1.25],high:[1,1.6]};
 const CAMERA_CONFIG={fov:78,near:.06,far:110};
@@ -79,23 +80,28 @@ function Soldier({player}){
  </group>;
 }
 
-function createRifle(){
+function createRifle(weaponId){
+ const weapon=WEAPONS[weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
+ const isSmg=weaponId==='VXR9',isSniper=weaponId==='MKR12',isBattle=weaponId==='BR7';
+ const barrelLength=isSniper?1.18:isSmg?.48:isBattle?.82:.68;
  const gun=new Group();
  const body=new MeshStandardMaterial({color:'#252b2d',roughness:.41,metalness:.68});
  const metal=new MeshStandardMaterial({color:'#454e50',roughness:.43,metalness:.75});
  const grip=new MeshStandardMaterial({color:'#11171b',roughness:.78,metalness:.25});
- const detail=new MeshStandardMaterial({color:'#a08c5b',roughness:.65,metalness:.44});
+ const detail=new MeshStandardMaterial({color:weapon.accent,roughness:.65,metalness:.44});
  const parts=[
-  {p:[0,-.01,-.27],s:[.22,.25,.67],mat:body},
-  {p:[0,.01,-.76],s:[.13,.14,.66],mat:metal},
-  {p:[0,.04,-1.12],s:[.07,.06,.32],mat:body},
-  {p:[0,.17,-.35],s:[.11,.07,.40],mat:detail},
+  {p:[0,-.01,-.27],s:[isBattle?.25:.22,.25,isSniper?.84:.67],mat:body},
+  {p:[0,.01,-.64],s:[.13,.14,barrelLength],mat:metal},
+  {p:[0,.04,-.92-barrelLength/2],s:[.07,.06,.3],mat:body},
+  {p:[0,.17,-.35],s:[.11,.07,isSniper?.52:.4],mat:detail},
   {p:[0,.23,-.49],s:[.06,.08,.08],mat:grip},
-  {p:[.02,-.22,-.14],s:[.15,.39,.17],mat:grip},
+  {p:[.02,-.22,-.14],s:[.15,isSmg?.25:.39,.17],mat:grip},
   {p:[0,-.19,-.59],s:[.12,.16,.19],mat:grip},
   {p:[0,-.10,.18],s:[.21,.16,.42],mat:grip},
-  {p:[0,.05,-1.3],s:[.12,.12,.06],mat:metal}
+  {p:[0,.05,-1.07-barrelLength/2],s:[.12,.12,.06],mat:metal}
  ];
+ if(isSniper)parts.push({p:[0,.30,-.56],s:[.19,.16,.63],mat:body});
+ if(isBattle)parts.push({p:[0,-.08,-.96],s:[.17,.14,.28],mat:detail});
  for(const {p,s,mat} of parts){
   const item=new Mesh(new BoxGeometry(...s),mat);
   item.position.set(...p);item.castShadow=false;gun.add(item);
@@ -103,7 +109,12 @@ function createRifle(){
  gun.position.set(.35,-.37,-.53);
  return gun;
 }
-
+function disposeRifle(weapon){
+ if(!weapon)return;
+ const materials=new Set();
+ weapon.traverse(obj=>{if(obj.isMesh){obj.geometry.dispose();materials.add(obj.material);}});
+ materials.forEach(material=>material.dispose());
+}
 function PlayerController({player,status,socket}){
  const {camera,gl,scene}=useThree();
  const target=useMemo(()=>new Vector3(),[]);
@@ -114,11 +125,12 @@ function PlayerController({player,status,socket}){
  });
  const yaw=useRef(player.yaw),pitch=useRef(player.pitch);
  const sendTimer=useRef(0),fireTimer=useRef(0),bob=useRef(0),recoil=useRef(0);
- const gun=useRef(null),firing=useRef(false),running=useRef(false);
+ const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false);
+ const visibleWeapon=useRef(player.weaponId||DEFAULT_WEAPON_ID);
  running.current=status==='playing'&&player.hp>0;
  useEffect(()=>{
   const dom=gl.domElement;
-  const weapon=createRifle();
+  const weapon=createRifle(visibleWeapon.current);
   gun.current=weapon;camera.add(weapon);scene.add(camera);
   const lock=()=>{if(running.current&&document.pointerLockElement!==dom)dom.requestPointerLock?.();};
   const move=e=>{
@@ -128,23 +140,40 @@ function PlayerController({player,status,socket}){
   };
   const keyDown=e=>{
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
-   if(e.repeat&&e.code==='KeyR')return;
+   if(e.repeat&&(/^(Digit[1-4]|KeyR)$/.test(e.code)))return;
    keys.current.add(e.code);
-   if(e.code==='KeyR'&&running.current)socket.emit('player:reload');
+   if(!running.current)return;
+   if(e.code==='KeyR')socket.emit('player:reload');
+   const match=e.code.match(/^Digit([1-4])$/);
+   if(match){
+    const selected=WEAPON_IDS[Number(match[1])-1];
+    if(selected)socket.emit('player:select-weapon',selected);
+   }
   };
   const keyUp=e=>keys.current.delete(e.code);
   const mouseDown=e=>{
-   if(e.button!==0||document.pointerLockElement!==dom||!running.current)return;
+   if(document.pointerLockElement!==dom||!running.current)return;
+   if(e.button===2){e.preventDefault();aimHeld.current=true;return;}
+   if(e.button!==0)return;
    firing.current=true;fireTimer.current=0;
    socket.emit('player:fire');
   };
-  const mouseUp=e=>{if(e.button===0)firing.current=false;};
-  const loseFocus=()=>{keys.current.clear();firing.current=false;};
+  const mouseUp=e=>{
+   if(e.button===0)firing.current=false;
+   if(e.button===2)aimHeld.current=false;
+  };
+  const contextMenu=e=>{if(document.pointerLockElement===dom)e.preventDefault();};
+  const loseFocus=()=>{keys.current.clear();firing.current=false;aimHeld.current=false;};
   const pointerChange=()=>{if(document.pointerLockElement!==dom)loseFocus();};
-  const onShot=event=>{if(event.shooterId===socket.id)recoil.current=1;};
+  const onShot=event=>{
+   if(event.shooterId!==socket.id)return;
+   const current=WEAPONS[event.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
+   recoil.current=1;
+   pitch.current=Math.min(1.42,pitch.current+current.recoil*.33);
+  };
   const onRespawn=data=>{
    yaw.current=data.yaw;pitch.current=0;recoil.current=0;
-   keys.current.clear();
+   keys.current.clear();aimHeld.current=false;firing.current=false;
    if(Number.isFinite(data.x)&&Number.isFinite(data.y)&&Number.isFinite(data.z))
     local.current={x:data.x,y:data.y,z:data.z,vy:0,grounded:true,crouch:false,jumpHeld:false};
   };
@@ -154,6 +183,7 @@ function PlayerController({player,status,socket}){
   document.addEventListener('keyup',keyUp);
   document.addEventListener('mousedown',mouseDown);
   document.addEventListener('mouseup',mouseUp);
+  dom.addEventListener('contextmenu',contextMenu);
   document.addEventListener('pointerlockchange',pointerChange);
   window.addEventListener('blur',loseFocus);
   socket.on('match:shot',onShot);socket.on('player:respawn',onRespawn);
@@ -164,22 +194,30 @@ function PlayerController({player,status,socket}){
    document.removeEventListener('keyup',keyUp);
    document.removeEventListener('mousedown',mouseDown);
    document.removeEventListener('mouseup',mouseUp);
+   dom.removeEventListener('contextmenu',contextMenu);
    document.removeEventListener('pointerlockchange',pointerChange);
    window.removeEventListener('blur',loseFocus);
    socket.off('match:shot',onShot);socket.off('player:respawn',onRespawn);
    if(document.pointerLockElement===dom)document.exitPointerLock?.();
-   camera.remove(weapon);scene.remove(camera);
-   const materials=new Set();
-   weapon.traverse(obj=>{if(obj.isMesh){obj.geometry.dispose();materials.add(obj.material);}});
-   materials.forEach(m=>m.dispose());gun.current=null;
+   camera.remove(gun.current);scene.remove(camera);
+   disposeRifle(gun.current);gun.current=null;
   };
  },[camera,gl,scene,socket]);
  useFrame((_,frameDelta)=>{
   const dt=Math.min(frameDelta,.05),keysNow=keys.current;
+  const playerWeapon=WEAPONS[player.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
+  if(visibleWeapon.current!==playerWeapon.id){
+   camera.remove(gun.current);disposeRifle(gun.current);
+   gun.current=createRifle(playerWeapon.id);camera.add(gun.current);
+   visibleWeapon.current=playerWeapon.id;
+   fireTimer.current=0;firing.current=false;
+  }
+  const ads=aimHeld.current&&!(keysNow.has('ShiftLeft')||keysNow.has('ShiftRight'));
   const input={
    forward:Number(keysNow.has('KeyW')||keysNow.has('ArrowUp'))-Number(keysNow.has('KeyS')||keysNow.has('ArrowDown')),
    strafe:Number(keysNow.has('KeyD')||keysNow.has('ArrowRight'))-Number(keysNow.has('KeyA')||keysNow.has('ArrowLeft')),
-   sprint:keysNow.has('ShiftLeft')||keysNow.has('ShiftRight'),
+   sprint:(keysNow.has('ShiftLeft')||keysNow.has('ShiftRight'))&&!ads,
+   ads,
    jump:keysNow.has('Space'),
    crouch:keysNow.has('ControlLeft')||keysNow.has('ControlRight')||keysNow.has('KeyC'),
    yaw:yaw.current,pitch:pitch.current
@@ -202,13 +240,23 @@ function PlayerController({player,status,socket}){
   camera.position.lerp(target.set(predicted.x,predicted.y+eye+motion,predicted.z),smoothingFactor(dt,24));
   camera.rotation.set(pitch.current,yaw.current,0,'YXZ');
   recoil.current=Math.max(0,recoil.current-dt*7);
+  viewAds.current+=(Number(ads)-viewAds.current)*smoothingFactor(dt,12);
+  const zoom=viewAds.current;
+  const fov=78+(playerWeapon.adsFov-78)*zoom;
+  if(Math.abs(camera.fov-fov)>.025){camera.fov=fov;camera.updateProjectionMatrix();}
   if(gun.current){
-   gun.current.position.set(.35+motion*.24,-.37+motion*.16,-.53+recoil.current*.14+(input.sprint?.07:0));
-   gun.current.rotation.x=-recoil.current*.14+(input.sprint?-.08:0);
+   gun.current.position.set(
+    .35+motion*.24+(-.305-motion*.24)*zoom,
+    -.37+motion*.16+(.13-motion*.16)*zoom,
+    -.53+recoil.current*.14+(input.sprint?.07:0)+.12*zoom
+   );
+   gun.current.rotation.x=-recoil.current*playerWeapon.recoil+(input.sprint?-.08:0);
   }
-  if(running.current&&firing.current){
+  if(running.current&&firing.current&&playerWeapon.automatic){
    fireTimer.current+=dt;
-   if(fireTimer.current>=.19){fireTimer.current=0;socket.emit('player:fire');}
+   if(fireTimer.current>=playerWeapon.fireIntervalMs/1000){
+    fireTimer.current=0;socket.emit('player:fire');
+   }
   }
   sendTimer.current+=dt;
   if(sendTimer.current>=1/25){
