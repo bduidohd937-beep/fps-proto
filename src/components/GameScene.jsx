@@ -28,7 +28,7 @@ function Soldier({player}){
   model.rotation.y+=shortestAngleDelta(model.rotation.y,player.yaw)*smoothingFactor(delta,18);
  });
  if(!player||player.hp<=0)return null;
- const crouchScale=player.crouch?.67:1;
+ const crouchScale=player.crouch?0.67:1;
  return <group ref={visual} position={origin.position} rotation={origin.rotation}>
   <group scale={[1,crouchScale,1]}>
    <mesh position={[0,1.03,0]} castShadow>
