@@ -1,0 +1,16 @@
+# PROJECT DUEL: frontend (Vite build) + Socket.IO game server in one Node service.
+# Select the free plan for prototype testing; do not enable paid upgrades.
+services:
+  - type: web
+    name: fps-proto-duel
+    runtime: node
+    plan: free
+    region: singapore
+    branch: feat/online-fps-mvp-v0.1
+    buildCommand: npm install --include=dev --no-audit --no-fund && npm run check
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
