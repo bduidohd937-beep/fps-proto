@@ -11,6 +11,7 @@ export default function App(){
  const [typedCode,setTypedCode]=useState(()=>new URLSearchParams(window.location.search).get('room')?.toUpperCase()||'');
  const [match,setMatch]=useState(null);
  const [message,setMessage]=useState('');
+ const [roomPending,setRoomPending]=useState('');
  const [hitmarker,setHitmarker]=useState(false);
  const [damageFlash,setDamageFlash]=useState(false);
  const [now,setNow]=useState(Date.now());
@@ -18,14 +19,18 @@ export default function App(){
  useEffect(()=>{
   const socket=io({reconnectionAttempts:10});socketRef.current=socket;
   socket.on('connect',()=>{setConnected(true);setMessage('');});
+  socket.on('connect_error',()=>{
+   setConnected(false);setRoomPending('');
+   setMessage('게임 서버에 연결할 수 없습니다. 서버 실행 상태를 확인해 주세요.');
+  });
   socket.on('disconnect',()=>{
    setConnected(false);setMessage('서버 연결이 끊겼습니다. 재접속 중입니다.');
-   setMatch(null);setRoomCode('');setMyId('');
+   setMatch(null);setRoomCode('');setMyId('');setRoomPending('');
   });
   socket.on('room:ready',({code,playerId})=>{
-   setRoomCode(code);setMyId(playerId);lastHp.current=null;setMessage('');
+   setRoomCode(code);setMyId(playerId);lastHp.current=null;setMessage('');setRoomPending('');
   });
-  socket.on('room:error',setMessage);
+  socket.on('room:error',error=>{setRoomPending('');setMessage(error);});
   socket.on('room:message',setMessage);
   socket.on('match:state',setMatch);
   socket.on('match:shot',({shooterId,targetId})=>{
@@ -51,12 +56,41 @@ export default function App(){
   const timer=window.setInterval(()=>setNow(Date.now()),100);
   return ()=>window.clearInterval(timer);
  },[]);
- const createRoom=()=>{setMessage('');socketRef.current?.emit('room:create');};
+ const requestRoom=(action,code)=>{
+  const socket=socketRef.current;
+  if(!socket?.connected)return setMessage('게임 서버 연결이 끊겼습니다. 서버 실행 상태를 확인해 주세요.');
+  if(roomPending)return;
+  setRoomPending(action);
+  setMessage(action==='create'?'전장 생성 요청을 서버에 전송 중입니다...':'초대 코드 확인 및 입장 요청 중입니다...');
+  const event=action==='create'?'room:create':'room:join';
+  const finish=(error,response)=>{
+   setRoomPending('');
+   if(error){
+    setMessage('서버에서 7초 동안 방 생성/입장 응답이 없습니다. 서버를 재시작하고 페이지를 새로고침해 주세요.');
+    return;
+   }
+   if(!response?.ok){
+    setMessage(response?.message||'서버가 요청을 처리하지 못했습니다. 다시 시도해 주세요.');
+    return;
+   }
+   if(!response.code||!response.playerId||!response.state){
+    setMessage('서버 응답에 방 정보가 부족합니다. 최신 서버 코드로 재시작해 주세요.');
+    return;
+   }
+   setRoomCode(response.code);
+   setMyId(response.playerId);
+   setMatch(response.state);
+   setMessage('');
+  };
+  if(action==='create')socket.timeout(7000).emit(event,finish);
+  else socket.timeout(7000).emit(event,code,finish);
+ };
+ const createRoom=()=>requestRoom('create');
  const joinRoom=e=>{
   e.preventDefault();
   const code=typedCode.replace(/[^A-Z0-9]/gi,'').toUpperCase();
   if(code.length!==6)return setMessage('초대 코드 6자리를 입력해 주세요.');
-  setMessage('');socketRef.current?.emit('room:join',code);
+  requestRoom('join',code);
  };
  const leaveRoom=()=>{
   if(document.pointerLockElement)document.exitPointerLock?.();
@@ -80,7 +114,7 @@ export default function App(){
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER</div>
+   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.1</div>
    <h1>PROJECT <span className="glow">DUEL</span></h1>
    <p className="subtitle">친구와 단둘이. 단 하나의 승자. 설치 없는 3D FPS.</p>
    <div className="lobby-grid">
@@ -88,7 +122,7 @@ export default function App(){
      <div className="pane-kicker">01 / HOST</div>
      <h2>새로운 전장 열기</h2>
      <p>방을 만들고 생성된 초대 코드를 친구에게 보내.</p>
-     <button className="primary big" disabled={!connected} onClick={createRoom}>+ 전장 생성</button>
+     <button type="button" className="primary big" disabled={!connected||!!roomPending} onClick={createRoom}>{roomPending==='create'?'전장 생성 중...':'+ 전장 생성'}</button>
     </div>
     <form className="pane" onSubmit={joinRoom}>
      <div className="pane-kicker">02 / JOIN</div>
@@ -97,7 +131,7 @@ export default function App(){
      <div className="join-row">
       <input aria-label="초대 코드" maxLength={6} value={typedCode}
        onChange={e=>setTypedCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} placeholder="ABC123"/>
-      <button className="secondary" disabled={!connected} type="submit">입장</button>
+      <button className="secondary" disabled={!connected||!!roomPending} type="submit">{roomPending==='join'?'입장 중...':'입장'}</button>
      </div>
     </form>
    </div>
