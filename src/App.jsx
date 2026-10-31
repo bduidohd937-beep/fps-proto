@@ -27,8 +27,8 @@ export default function App(){
    try{
     const response=await fetch('/api/health',{cache:'no-store',signal:controller.signal});
     const info=await response.json();
-    if(!response.ok||info.service!=='project-duel'||info.protocol!==2){
-     setMessage('연결된 서버가 PROJECT DUEL V0.1.2 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
+    if(!response.ok||info.service!=='project-duel'||info.protocol!==3){
+     setMessage('연결된 서버가 PROJECT DUEL FRONTLINE V0.2.2 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
      return;
     }
     if(!socket.connected)return;
@@ -134,9 +134,9 @@ export default function App(){
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.3</div>
+   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · FRONTLINE · V0.2.2</div>
    <h1>PROJECT <span className="glow">DUEL</span></h1>
-   <p className="subtitle">친구와 단둘이. 단 하나의 승자. 설치 없는 3D FPS.</p>
+   <p className="subtitle">군수기지 IRON DEPOT에서 벌이는 설치 없는 온라인 1대1 FPS.</p>
    <div className="lobby-grid">
     <div className="pane main-pane">
      <div className="pane-kicker">01 / HOST</div>
@@ -165,7 +165,9 @@ export default function App(){
    </div>
    <div className="instructions">
     <span><kbd>W A S D</kbd> 이동</span>
-    <span><kbd>SHIFT</kbd> 달리기</span>
+    <span><kbd>SHIFT</kbd> 전력질주</span>
+    <span><kbd>SPACE</kbd> 점프</span>
+    <span><kbd>CTRL / C</kbd> 앉기</span>
     <span><kbd>마우스</kbd> 조준 · 발사</span>
     <span><kbd>R</kbd> 장전</span>
     <span><kbd>ESC</kbd> 커서 해제</span>
@@ -191,7 +193,11 @@ export default function App(){
    {match.status==='playing'&&alive&&<div className={'crosshair '+(hitmarker?'hit':'')}>
     <span/><span/><span/><span/><i/>
    </div>}
-   {match.status==='playing'&&alive&&<div className="aim-hint">화면 클릭: 조준 · ESC: 커서 해제</div>}
+   {match.status==='playing'&&alive&&<div className="aim-hint">클릭 후 마우스 조준 · SPACE 점프 · SHIFT 전력질주 · CTRL 앉기 · R 장전</div>}
+   {match.status==='playing'&&me&&<div className="movement-status" aria-label="이동 상태">
+    <span data-testid="stance">{me.crouch?"앉기":me.grounded?"지상":"공중"}</span>
+    <span data-testid="altitude" data-y={Number(me.y??0).toFixed(2)}>고도 {Number(me.y??0).toFixed(1)}m</span>
+   </div>}
    <footer className="battle-hud">
     <div className="hud-module"><small>HEALTH</small>
      <div className="hp-text">{me.hp}<span> / {MAX_HP}</span></div>
