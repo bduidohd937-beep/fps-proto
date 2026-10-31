@@ -12,7 +12,9 @@ const io=new Server(server,{maxHttpBufferSize:8192});
 const rooms=new Map(),socketRooms=new Map();
 const ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TICK_MS=1000/30, SNAPSHOT_EVERY=2;
-app.get('/api/health',(_req,res)=>res.json({ok:true,rooms:rooms.size}));
+const GAME_SERVICE = 'project-duel';
+const GAME_PROTOCOL = 2;
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:GAME_SERVICE,protocol:GAME_PROTOCOL,version:'0.1.2',rooms:rooms.size}));
 const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 if(existsSync(dist)){
  app.use(express.static(dist));
@@ -138,5 +140,9 @@ const ticker=setInterval(()=>{
  }
 },TICK_MS);
 ticker.unref();
-const PORT=Number(process.env.PORT)||3001;
-server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL server listening on port '+PORT));
+const PORT=Number(process.env.PORT || process.env.GAME_PORT)||43171;
+server.on('error',error=>{
+ console.error('PROJECT DUEL server startup failed:',error.code||error.message);
+ process.exitCode=1;
+});
+server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL V0.1.2 game server on port '+PORT));
