@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {io} from 'socket.io-client';
 import GameScene from './components/GameScene.jsx';
-import {MAX_HP,MAX_AMMO} from '../shared/rules.js';
+import {MAX_HP} from '../shared/rules.js';
+import {WEAPON_IDS,WEAPONS,DEFAULT_WEAPON_ID} from '../shared/weapons.js';
 
 export default function App(){
  const socketRef=useRef(null);
@@ -14,6 +15,7 @@ export default function App(){
  const [graphicsQuality,setGraphicsQuality]=useState('balanced');
  const [roomPending,setRoomPending]=useState('');
  const [hitmarker,setHitmarker]=useState(false);
+ const [headshot,setHeadshot]=useState(false);
  const [damageFlash,setDamageFlash]=useState(false);
  const [now,setNow]=useState(Date.now());
  const lastHp=useRef(null);
@@ -27,8 +29,8 @@ export default function App(){
    try{
     const response=await fetch('/api/health',{cache:'no-store',signal:controller.signal});
     const info=await response.json();
-    if(!response.ok||info.service!=='project-duel'||info.protocol!==3){
-     setMessage('연결된 서버가 PROJECT DUEL FRONTLINE V0.2.2 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
+    if(!response.ok||info.service!=='project-duel'||info.protocol!==4){
+     setMessage('연결된 서버가 PROJECT DUEL FRONTLINE V0.2.3 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
      return;
     }
     if(!socket.connected)return;
@@ -53,9 +55,12 @@ export default function App(){
   socket.on('room:error',error=>{setRoomPending('');setMessage(error);});
   socket.on('room:message',setMessage);
   socket.on('match:state',setMatch);
-  socket.on('match:shot',({shooterId,targetId})=>{
+  socket.on('match:shot',({shooterId,targetId,zone})=>{
    if(shooterId===socket.id&&targetId){
-    setHitmarker(true);window.setTimeout(()=>setHitmarker(false),160);
+    setHitmarker(true);
+    setHeadshot(zone==='head');
+    window.setTimeout(()=>setHitmarker(false),160);
+    window.setTimeout(()=>setHeadshot(false),440);
    }
   });
   return ()=>{socket.disconnect();socketRef.current=null;};
@@ -127,14 +132,21 @@ export default function App(){
   }
  };
  const restart=()=>socketRef.current?.emit('match:restart');
+ const selectWeapon=id=>{
+  if(!socketRef.current?.connected||!match||match.status!=='playing')return;
+  socketRef.current.emit('player:select-weapon',id,reply=>{
+   if(!reply?.ok)setMessage(reply?.message||'무기를 변경할 수 없습니다.');
+  });
+ };
  const alive=me&&me.hp>0, reloading=me&&me.reloadAt>now;
  const respawning=me&&me.hp<=0&&match?.status==='playing';
  const gameActive=roomCode&&me&&match;
  const won=match?.winnerId===myId;
+ const weapon=WEAPONS[me?.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · FRONTLINE · V0.2.2</div>
+   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · FRONTLINE · V0.2.3</div>
    <h1>PROJECT <span className="glow">DUEL</span></h1>
    <p className="subtitle">군수기지 IRON DEPOT에서 벌이는 설치 없는 온라인 1대1 FPS.</p>
    <div className="lobby-grid">
@@ -168,7 +180,9 @@ export default function App(){
     <span><kbd>SHIFT</kbd> 전력질주</span>
     <span><kbd>SPACE</kbd> 점프</span>
     <span><kbd>CTRL / C</kbd> 앉기</span>
-    <span><kbd>마우스</kbd> 조준 · 발사</span>
+    <span><kbd>우클릭</kbd> 정조준 ADS</span>
+    <span><kbd>좌클릭</kbd> 사격</span>
+    <span><kbd>1~4</kbd> 무기 변경</span>
     <span><kbd>R</kbd> 장전</span>
     <span><kbd>ESC</kbd> 커서 해제</span>
    </div>
@@ -190,23 +204,32 @@ export default function App(){
      <button className="text-button" onClick={copyInvite}>초대 링크</button>
     </div>
    </header>
-   {match.status==='playing'&&alive&&<div className={'crosshair '+(hitmarker?'hit':'')}>
+   {match.status==='playing'&&alive&&<div className={'crosshair '+(hitmarker?'hit ':'')+(me.ads?'ads':'')}>
     <span/><span/><span/><span/><i/>
    </div>}
-   {match.status==='playing'&&alive&&<div className="aim-hint">클릭 후 마우스 조준 · SPACE 점프 · SHIFT 전력질주 · CTRL 앉기 · R 장전</div>}
+   {match.status==='playing'&&alive&&<div className="aim-hint">좌클릭 사격 · 우클릭 정조준 · 1~4 무기 · SPACE 점프 · R 장전</div>}
+   {headshot&&alive&&<div className="headshot-confirmation" role="status">HEADSHOT +</div>}
    {match.status==='playing'&&me&&<div className="movement-status" aria-label="이동 상태">
     <span data-testid="stance">{me.crouch?"앉기":me.grounded?"지상":"공중"}</span>
     <span data-testid="altitude" data-y={Number(me.y??0).toFixed(2)}>고도 {Number(me.y??0).toFixed(1)}m</span>
    </div>}
+   <div className="loadout-bar" aria-label="무기 선택">
+    {WEAPON_IDS.map((id,i)=><button key={id} type="button" disabled={match.status!=='playing'||!alive}
+     className={'weapon-slot '+(weapon.id===id?'selected':'')}
+     aria-label={WEAPONS[id].name+' 장착'}
+     onClick={()=>selectWeapon(id)}>
+      <span>{i+1}</span><strong>{WEAPONS[id].name}</strong><small>{WEAPONS[id].category}</small>
+     </button>)}
+   </div>
    <footer className="battle-hud">
     <div className="hud-module"><small>HEALTH</small>
      <div className="hp-text">{me.hp}<span> / {MAX_HP}</span></div>
      <div className="hp-track"><div style={{width:me.hp+'%'}}/></div>
     </div>
-    <div className="hud-module ammo"><small>ASSAULT RIFLE / AMMO</small>
+    <div className="hud-module ammo"><small>{weapon.name} / {weapon.category} / AMMO</small>
      <div className="ammo-value">{reloading?'RELOADING':me.ammo}
-      <span>{reloading?'':' / '+MAX_AMMO}</span>
-     </div><div className="ammo-caption">R 장전 · 좌클릭 발사</div>
+      <span>{reloading?'':' / '+weapon.magazine}</span>
+     </div><div className="ammo-caption">{me.ads?'ADS 정조준 · ':''}R 장전 · 우클릭 정조준 · {weapon.automatic?'자동 연사':'단발 사격'}</div>
     </div>
    </footer>
    {message&&<div className="battle-notice" role="status">{message}</div>}
