@@ -50,25 +50,31 @@ function leave(socket){
  io.to(code).emit('room:message','상대가 나갔습니다. 친구가 다시 입장하면 전투가 시작됩니다.');
 }
 io.on('connection',socket=>{
- socket.on('room:create',()=>{
+ socket.on('room:create',ack=>{
   leave(socket);
   const code=roomCode();
   const room={code,players:[newPlayer(socket,0)],status:'waiting',winnerId:null};
   rooms.set(code,room);socketRooms.set(socket.id,code);socket.join(code);
   socket.emit('room:ready',{code,playerId:socket.id});broadcast(room);
+  if(typeof ack==='function')ack({ok:true,code,playerId:socket.id,state:publicState(room)});
  });
- socket.on('room:join',raw=>{
+ socket.on('room:join',(raw,ack)=>{
+  const reply=payload=>{if(typeof ack==='function')ack(payload);};
+  const error=message=>{socket.emit('room:error',message);reply({ok:false,message});};
   const code=String(raw??'').trim().toUpperCase(),room=rooms.get(code);
-  if(!room)return socket.emit('room:error','해당 방을 찾을 수 없습니다.');
+  if(!room)return error('해당 방을 찾을 수 없습니다.');
   if(room.players.length>=2&&!room.players.some(p=>p.id===socket.id))
-    return socket.emit('room:error','이미 두 명이 플레이 중인 방입니다.');
-  if(socketRooms.get(socket.id)===code)
-    return socket.emit('room:ready',{code,playerId:socket.id});
+    return error('이미 두 명이 플레이 중인 방입니다.');
+  if(socketRooms.get(socket.id)===code){
+    socket.emit('room:ready',{code,playerId:socket.id});
+    return reply({ok:true,code,playerId:socket.id,state:publicState(room)});
+  }
   leave(socket);
   room.players.push(newPlayer(socket,room.players.length));
   socketRooms.set(socket.id,code);socket.join(code);
   socket.emit('room:ready',{code,playerId:socket.id});
   resetMatch(room);io.to(code).emit('room:message','두 플레이어 연결 완료! 전투 시작!');
+  reply({ok:true,code,playerId:socket.id,state:publicState(room)});
  });
  socket.on('room:leave',()=>leave(socket));
  socket.on('player:input',data=>{
