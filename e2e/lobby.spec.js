@@ -25,3 +25,14 @@ test('browser can create a room and a second client can join',async ({page,brows
   await peerContext.close();
  }
 });
+
+test('low graphics mode keeps room creation playable',async ({page})=>{
+ await page.goto('/');
+ await expect(page.getByText('게임 서버 연결됨')).toBeVisible();
+ const setting=page.getByLabel('그래픽 품질');
+ await setting.selectOption('low');
+ await expect(setting).toHaveValue('low');
+ await page.getByRole('button',{name:'전장 생성',exact:false}).click();
+ await expect(page.getByText('친구를 기다리는 중')).toBeVisible();
+ await expect(page.locator('canvas')).toBeVisible();
+});

@@ -11,6 +11,7 @@ export default function App(){
  const [typedCode,setTypedCode]=useState(()=>new URLSearchParams(window.location.search).get('room')?.toUpperCase()||'');
  const [match,setMatch]=useState(null);
  const [message,setMessage]=useState('');
+ const [graphicsQuality,setGraphicsQuality]=useState('balanced');
  const [roomPending,setRoomPending]=useState('');
  const [hitmarker,setHitmarker]=useState(false);
  const [damageFlash,setDamageFlash]=useState(false);
@@ -133,7 +134,7 @@ export default function App(){
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.2</div>
+   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · MULTIPLAYER · V0.1.3</div>
    <h1>PROJECT <span className="glow">DUEL</span></h1>
    <p className="subtitle">친구와 단둘이. 단 하나의 승자. 설치 없는 3D FPS.</p>
    <div className="lobby-grid">
@@ -154,6 +155,14 @@ export default function App(){
      </div>
     </form>
    </div>
+   <div className="graphics-option">
+    <label htmlFor="graphics-quality">그래픽 품질</label>
+    <select id="graphics-quality" value={graphicsQuality} onChange={e=>setGraphicsQuality(e.target.value)}>
+     <option value="low">성능 우선</option>
+     <option value="balanced">균형 (추천)</option>
+     <option value="high">고화질</option>
+    </select>
+   </div>
    <div className="instructions">
     <span><kbd>W A S D</kbd> 이동</span>
     <span><kbd>SHIFT</kbd> 달리기</span>
@@ -165,7 +174,7 @@ export default function App(){
     {connected?'게임 서버 연결됨':'서버 연결 중...'}</p>
    {message&&<div className="notice" role="status">{message}</div>}
   </section>:<section className="battle">
-   <GameScene me={me} enemy={enemy} status={match.status} socket={socketRef.current}/>
+   <GameScene me={me} enemy={enemy} status={match.status} socket={socketRef.current} quality={graphicsQuality}/>
    <div className="battle-vignette"/>
    {damageFlash&&<div className="damage-flash"/>}
    <header className="battle-header">

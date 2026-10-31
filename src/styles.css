@@ -65,3 +65,9 @@
 .scoreboard{gap:8px}.score{font-size:30px}.score small,.room-label{display:none}.score-mid span{font-size:8px}
 .battle-hud{padding:18px}.hud-module{min-width:130px}.hp-track{width:125px}.hp-text,.ammo-value{font-size:39px}.ammo-caption{font-size:10px}
 }
+
+.graphics-option{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:28px;color:#9bb5c9;font-size:12px}
+.graphics-option label{font-weight:700;letter-spacing:.5px}
+.graphics-option select{color:#d3f3ff;background:#17293c;border:1px solid #46657d;border-radius:6px;padding:7px 10px;outline:none}
+.graphics-option select:focus-visible{border-color:#55c8eb}
+@media(max-width:720px){.graphics-option{justify-content:flex-start}}

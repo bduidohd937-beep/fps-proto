@@ -1,9 +1,10 @@
-import {useEffect,useRef} from 'react';
+import {memo,useEffect,useMemo,useRef} from 'react';
 import {Canvas,useFrame,useThree} from '@react-three/fiber';
 import {Vector3,Group,Mesh,BoxGeometry,MeshStandardMaterial} from 'three';
 import {ARENA_HALF,COVER,PLAYER_EYE,movePlayer} from '../../shared/rules.js';
+import {smoothingFactor,shortestAngleDelta} from '../game/renderSmoothing.js';
 
-function Arena(){
+const Arena=memo(function Arena({quality}){
  const wallHeight=5;
  const walls=[
   {pos:[0,wallHeight/2,-ARENA_HALF],size:[ARENA_HALF*2,wallHeight,.6]},
@@ -16,7 +17,7 @@ function Arena(){
   <fog attach="fog" args={['#080f1e',25,72]}/>
   <ambientLight intensity={1.3}/>
   <hemisphereLight intensity={1.4} groundColor="#182036"/>
-  <directionalLight position={[8,22,11]} intensity={2.5} castShadow shadow-mapSize={[1024,1024]}/>
+  <directionalLight position={[8,22,11]} intensity={2.5} castShadow={quality!=='low'} shadow-mapSize={quality==='high'?[1024,1024]:[512,512]}/>
   <pointLight position={[0,7,0]} color="#3ac6ef" intensity={45} distance={28}/>
   <mesh rotation={[-Math.PI/2,0,0]} receiveShadow>
    <planeGeometry args={[ARENA_HALF*2,ARENA_HALF*2]}/>
@@ -37,10 +38,25 @@ function Arena(){
    </mesh>
   </group>)}
  </>;
-}
+});
 function Opponent({player}){
+ const visual=useRef(null);
+ useFrame((_,delta)=>{
+  const mesh=visual.current;
+  if(!mesh||!player||player.hp<=0)return;
+  const dx=player.x-mesh.position.x,dz=player.z-mesh.position.z;
+  if(dx*dx+dz*dz>64){
+   // Teleports and respawns should snap rather than cross the arena.
+   mesh.position.set(player.x,0,player.z);
+  }else{
+   const blend=smoothingFactor(delta,18);
+   mesh.position.x+=dx*blend;
+   mesh.position.z+=dz*blend;
+  }
+  mesh.rotation.y+=shortestAngleDelta(mesh.rotation.y,player.yaw)*smoothingFactor(delta,18);
+ });
  if(!player||player.hp<=0)return null;
- return <group position={[player.x,0,player.z]} rotation={[0,player.yaw,0]}>
+ return <group ref={visual} position={[player.x,0,player.z]} rotation={[0,player.yaw,0]}>
   <mesh position={[0,.85,0]} castShadow>
    <capsuleGeometry args={[.37,.77,6,12]}/>
    <meshStandardMaterial color="#f05d69" metalness={.28} roughness={.5}/>
@@ -87,6 +103,7 @@ function makeGun(){
 }
 function Controller({player,status,socket}){
  const {camera,gl,scene}=useThree();
+ const cameraTarget=useMemo(()=>new Vector3(),[]);
  const keys=useRef(new Set());
  const pos=useRef({x:player.x,z:player.z});
  const yaw=useRef(player.yaw),pitch=useRef(player.pitch);
@@ -147,7 +164,7 @@ function Controller({player,status,socket}){
   const sync=Math.min(1,dt*9);
   pos.current.x+=(player.x-pos.current.x)*sync;
   pos.current.z+=(player.z-pos.current.z)*sync;
-  camera.position.lerp(new Vector3(pos.current.x,PLAYER_EYE,pos.current.z),Math.min(1,dt*24));
+  camera.position.lerp(cameraTarget.set(pos.current.x,PLAYER_EYE,pos.current.z),Math.min(1,dt*24));
   camera.rotation.set(pitch.current,yaw.current,0,'YXZ');
   if(gun.current){
    recoil.current=Math.max(0,recoil.current-dt*8);
@@ -159,9 +176,10 @@ function Controller({player,status,socket}){
  });
  return null;
 }
-export default function GameScene({me,enemy,status,socket}){
- return <Canvas shadows camera={{fov:78,near:.06,far:90}} dpr={[1,1.6]}>
-  <Arena/>
+export default function GameScene({me,enemy,status,socket,quality='balanced'}){
+ const pixelRatio={low:[.75,1],balanced:[1,1.25],high:[1,1.6]}[quality]||[1,1.25];
+ return <Canvas shadows={quality!=='low'} camera={{fov:78,near:.06,far:90}} dpr={pixelRatio}>
+  <Arena quality={quality}/>
   {enemy&&<Opponent player={enemy}/>}
   {me&&socket&&<Controller key={me.id} player={me} status={status} socket={socket}/>}
  </Canvas>;
