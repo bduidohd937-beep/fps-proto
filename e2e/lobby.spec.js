@@ -20,6 +20,13 @@ test('browser can create a room and a second client can join',async ({page,brows
   await peer.getByRole('button',{name:'입장',exact:true}).click();
   await expect(peer.locator('.scoreboard')).toBeVisible();
   await expect(page.locator('.scoreboard')).toBeVisible();
+  // Real browser control must create actual server height, not a visual camera-only jump.
+  await page.keyboard.down('Space');
+  await expect.poll(async()=>Number(await page.getByTestId('altitude').getAttribute('data-y')),{timeout:4000}).toBeGreaterThan(.1);
+  await page.keyboard.up('Space');
+  await page.keyboard.down('c');
+  await expect(page.getByTestId('stance')).toHaveText('앉기',{timeout:4000});
+  await page.keyboard.up('c');
   expect(errors).toEqual([]);
  }finally{
   await peerContext.close();
