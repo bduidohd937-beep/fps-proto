@@ -43,7 +43,8 @@ test('two clients can create, join, shoot, reject third player and disconnect',a
  const health=await (await fetch(url+'/api/health')).json();
  assert.equal(health.ok,true);
  assert.equal(health.service,'project-duel');
- assert.equal(health.protocol,2);
+ assert.equal(health.protocol,3);
+ assert.equal(health.version,'0.2.2');
  const one=io(url,{transports:['websocket'],reconnection:false});
  clients.push(one);
  await waitFor(one,'connect');
@@ -83,6 +84,17 @@ test('two clients can create, join, shoot, reject third player and disconnect',a
  const fired=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.ammo===23);
  one.emit('player:fire');
  assert.equal((await fired).players.find(p=>p.id===one.id).ammo,23);
+ // Live server physics must expose the same airborne state to BOTH clients.
+ const jumping=waitFor(one,'match:state',state=>state.players.find(p=>p.id===one.id)?.y>.1);
+ const peerSeesJump=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.y>.1);
+ const rest={yaw:-Math.PI/2,pitch:0,forward:0,strafe:0,sprint:false};
+ one.emit('player:input',{...rest,jump:true,crouch:false});
+ const air=await jumping;
+ assert.equal(air.players.find(p=>p.id===one.id).grounded,false);
+ assert.ok((await peerSeesJump).players.find(p=>p.id===one.id).y>.1);
+ const crouchState=waitFor(two,'match:state',state=>state.players.find(p=>p.id===one.id)?.crouch===true);
+ one.emit('player:input',{...rest,jump:false,crouch:true});
+ assert.equal((await crouchState).players.find(p=>p.id===one.id).crouch,true);
  const left=waitFor(one,'match:state',state=>state.status==='waiting');
  two.disconnect();
  assert.equal((await left).players.length,1);
