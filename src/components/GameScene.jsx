@@ -4,6 +4,10 @@ import {Vector3,Group,Mesh,BoxGeometry,MeshStandardMaterial} from 'three';
 import {ARENA_HALF,COVER,PLAYER_EYE,movePlayer} from '../../shared/rules.js';
 import {smoothingFactor,shortestAngleDelta} from '../game/renderSmoothing.js';
 
+const QUALITY_DPR={low:[.75,1],balanced:[1,1.25],high:[1,1.6]};
+const CAMERA_CONFIG={fov:78,near:.06,far:90};
+const SHADOW_MAP_STANDARD=[512,512],SHADOW_MAP_HIGH=[1024,1024];
+
 const Arena=memo(function Arena({quality}){
  const wallHeight=5;
  const walls=[
@@ -17,7 +21,7 @@ const Arena=memo(function Arena({quality}){
   <fog attach="fog" args={['#080f1e',25,72]}/>
   <ambientLight intensity={1.3}/>
   <hemisphereLight intensity={1.4} groundColor="#182036"/>
-  <directionalLight position={[8,22,11]} intensity={2.5} castShadow={quality!=='low'} shadow-mapSize={quality==='high'?[1024,1024]:[512,512]}/>
+  <directionalLight position={[8,22,11]} intensity={2.5} castShadow={quality!=='low'} shadow-mapSize={quality==='high'?SHADOW_MAP_HIGH:SHADOW_MAP_STANDARD}/>
   <pointLight position={[0,7,0]} color="#3ac6ef" intensity={45} distance={28}/>
   <mesh rotation={[-Math.PI/2,0,0]} receiveShadow>
    <planeGeometry args={[ARENA_HALF*2,ARENA_HALF*2]}/>
@@ -41,6 +45,11 @@ const Arena=memo(function Arena({quality}){
 });
 function Opponent({player}){
  const visual=useRef(null);
+ // Keep declarative props stable; otherwise React overrides useFrame interpolation every snapshot.
+ const initialPose=useMemo(()=>({
+  position:[player?.x??0,0,player?.z??0],
+  rotation:[0,player?.yaw??0,0]
+ }),[player?.id]);
  useFrame((_,delta)=>{
   const mesh=visual.current;
   if(!mesh||!player||player.hp<=0)return;
@@ -56,7 +65,7 @@ function Opponent({player}){
   mesh.rotation.y+=shortestAngleDelta(mesh.rotation.y,player.yaw)*smoothingFactor(delta,18);
  });
  if(!player||player.hp<=0)return null;
- return <group ref={visual} position={[player.x,0,player.z]} rotation={[0,player.yaw,0]}>
+ return <group ref={visual} position={initialPose.position} rotation={initialPose.rotation}>
   <mesh position={[0,.85,0]} castShadow>
    <capsuleGeometry args={[.37,.77,6,12]}/>
    <meshStandardMaterial color="#f05d69" metalness={.28} roughness={.5}/>
@@ -177,8 +186,8 @@ function Controller({player,status,socket}){
  return null;
 }
 export default function GameScene({me,enemy,status,socket,quality='balanced'}){
- const pixelRatio={low:[.75,1],balanced:[1,1.25],high:[1,1.6]}[quality]||[1,1.25];
- return <Canvas shadows={quality!=='low'} camera={{fov:78,near:.06,far:90}} dpr={pixelRatio}>
+ const pixelRatio=QUALITY_DPR[quality]||QUALITY_DPR.balanced;
+ return <Canvas shadows={quality!=='low'} camera={CAMERA_CONFIG} dpr={pixelRatio}>
   <Arena quality={quality}/>
   {enemy&&<Opponent player={enemy}/>}
   {me&&socket&&<Controller key={me.id} player={me} status={status} socket={socket}/>}
