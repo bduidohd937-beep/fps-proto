@@ -25,3 +25,16 @@ export function sensitivityForAim(settings,ads){
  const safe=sanitizeSensitivity(settings);
  return safe.general*(ads?safe.ads:1);
 }
+export const MOUSE_ROTATION_SCALE=.0022;
+export function applyMouseRotation({yaw=0,pitch=0,movementX=0,movementY=0,settings,ads=false}){
+ const multiplier=sensitivityForAim(settings,ads);
+ const yawDelta=-movementX*MOUSE_ROTATION_SCALE*multiplier;
+ const pitchDelta=-movementY*MOUSE_ROTATION_SCALE*multiplier;
+ return {
+  yaw:yaw+yawDelta,
+  pitch:Math.max(-1.42,Math.min(1.42,pitch+pitchDelta)),
+  yawDelta,
+  pitchDelta,
+  sensitivity:multiplier
+ };
+}
