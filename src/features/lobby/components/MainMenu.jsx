@@ -4,10 +4,11 @@ import {OperatorPreview} from '../../operators/index.js';
 import {OPERATOR_IDS,OPERATORS} from '../../../../shared/operators.js';
 import {GAME_VERSION} from '../../../../shared/version.js';
 import {WEAPON_IDS,WEAPONS} from '../../../../shared/weapons.js';
+import {SettingsPanel} from '../../settings/index.js';
 
 // UI-only component. Network lifecycle and authoritative game state stay in App/server.
 export function MainMenu({connected,pending,message,typedCode,onCodeChange,onJoin,onCreate,onSolo,
- operatorId,onOperatorChange,quality,onQualityChange}){
+ operatorId,onOperatorChange,quality,onQualityChange,sensitivity,onSensitivityChange}){
  const [tab,setTab]=useState(()=>new URLSearchParams(window.location.search).has('room')?'private':'solo');
  const [difficulty,setDifficulty]=useState('rookie');
  const selected=OPERATORS[operatorId]||OPERATORS[OPERATOR_IDS[0]];
@@ -40,6 +41,9 @@ export function MainMenu({connected,pending,message,typedCode,onCodeChange,onJoi
      </button>
      <button type="button" className={tab==='armory'?'active':''} onClick={()=>setTab('armory')} aria-current={tab==='armory'?'page':undefined}>
       <span className="menu-tab-index">04</span><span>무기고 <small>LOADOUT PREVIEW</small></span><span className="menu-tab-arrow">›</span>
+     </button>
+     <button type="button" className={tab==='settings'?'active':''} onClick={()=>setTab('settings')} aria-current={tab==='settings'?'page':undefined}>
+      <span className="menu-tab-index">05</span><span>설정 <small>INPUT / SENSITIVITY</small></span><span className="menu-tab-arrow">›</span>
      </button>
     </nav>
     <section className="menu-action-panel">
@@ -94,6 +98,7 @@ export function MainMenu({connected,pending,message,typedCode,onCodeChange,onJoi
        </div>)}
       </div>
      </>}
+     {tab==='settings'&&<SettingsPanel value={sensitivity} onChange={onSensitivityChange} onReset={onSensitivityChange} embedded/>}
     </section>
     <div className="menu-bottom-tools">
      <GraphicsQualitySelect value={quality} onChange={onQualityChange}/>
