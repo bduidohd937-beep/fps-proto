@@ -1,7 +1,7 @@
 import {RESPAWN_MS,KILLS_TO_WIN} from '../../shared/rules.js';
 import {getWeapon} from '../../shared/weapons.js';
 import {traceShot,computeDamage,getShotSpread} from '../../shared/combat.js';
-import {RECOIL_RESET_MS,recoilPattern,getStance} from '../../shared/recoil.js';
+import {RECOIL_RESET_MS,recoilPattern,getStance,STANCE_AIM} from '../../shared/recoil.js';
 
 // Server-only hit resolution. The same rules are used by real sockets and bots.
 // Returns null when a shot is denied by ammunition, switch delay or fire cadence.
@@ -16,7 +16,10 @@ export function applyFire(room,shooter,now=Date.now(),random=Math.random){
  shooter.lastFireAt=now;shooter.ammo--;shooter.magazines[weapon.id]=shooter.ammo;shooter.shotsFired++;
  const target=room.players.find(p=>p.id!==shooter.id&&p.hp>0);
  const spread=getShotSpread(weapon,shooter);
- const hit=target?traceShot(shooter,target,weapon,pattern.yaw+(random()*2-1)*spread,pattern.pitch+(random()*2-1)*spread):null;
+ const factor=STANCE_AIM[stance].recoil;
+ const yawOffset=pattern.yaw*factor+(random()*2-1)*spread;
+ const pitchOffset=pattern.pitch*factor+(random()*2-1)*spread;
+ const hit=target?traceShot(shooter,target,weapon,yawOffset,pitchOffset):null;
  const damage=hit?computeDamage(weapon,hit.zone,hit.distance):0;
  shooter.bloom=Math.min(1.6,shooter.bloom+weapon.bloomPerShot);
  if(hit){
@@ -26,7 +29,7 @@ export function applyFire(room,shooter,now=Date.now(),random=Math.random){
    if(shooter.kills>=KILLS_TO_WIN){room.status='finished';room.winnerId=shooter.id;}
   }
  }
- return {shooterId:shooter.id,targetId:hit?target.id:null,weaponId:weapon.id,zone:hit?.zone??null,damage,eliminated:!!hit&&target.hp===0,shotIndex:shooter.shotsFired,recoilIndex:burstIndex,stance};
+ return {shooterId:shooter.id,targetId:hit?target.id:null,weaponId:weapon.id,zone:hit?.zone??null,damage,eliminated:!!hit&&target.hp===0,shotIndex:shooter.shotsFired,recoilIndex:burstIndex,stance,yawOffset,pitchOffset,spread};
 }
 export function updateReload(player,now){
  if(!player.reloadAt||now<player.reloadAt)return false;

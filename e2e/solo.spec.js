@@ -12,6 +12,7 @@ test('solo mode starts immediately, without any second browser joining',async ({
  await expect(page.locator('.scoreboard')).toContainText('BOT');
  await expect(page.getByText('친구를 기다리는 중')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'AR-4 장착'})).toHaveClass(/selected/);
+ await expect(page.locator('canvas')).toHaveAttribute('data-controller-ready','true');
  await page.keyboard.press('Digit2');
  await expect(page.getByRole('button',{name:'VXR-9 장착'})).toHaveClass(/selected/);
  expect(errors).toEqual([]);
@@ -52,6 +53,7 @@ test('Z prone toggles authoritative position while F3 controls debug HUD visibil
  await page.getByRole('button',{name:/AI 대전 시작/}).click();
  await expect(page.locator('.scoreboard')).toBeVisible({timeout:10000});
  const stance=page.getByTestId('stance');
+ await expect(page.locator('canvas')).toHaveAttribute('data-controller-ready','true');
  const debug=page.locator('.movement-status');
  await expect(debug).toHaveClass(/debug-hidden/);
  await page.keyboard.press('F3');

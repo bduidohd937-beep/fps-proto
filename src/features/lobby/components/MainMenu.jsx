@@ -103,7 +103,7 @@ export function MainMenu({connected,pending,message,typedCode,onCodeChange,onJoi
    </div>
    <aside className="menu-right" aria-label="선택 오퍼레이터">
     <div className="menu-scenery-label">MILITARY PERSONNEL / 01</div>
-    <OperatorPreview operatorId={operatorId} quality={quality}/>
+    {connected&&<OperatorPreview operatorId={operatorId} quality={quality}/>}
     <div className="menu-personnel-card">
      <div><small>CURRENT OPERATOR</small><strong>{selected.name}</strong><span>{selected.role} / {selected.tag}</span></div>
      <p>{selected.description}</p>

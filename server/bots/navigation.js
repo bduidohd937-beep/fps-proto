@@ -38,7 +38,7 @@ function nearestNode(x,z){
  for(const node of nodes){
   if(!node.open)continue;
   const d=(node.x-x)**2+(node.z-z)**2;
-  if(d<distance){distance=d;best=node;}
+  if(d<distance&&clearEdge({x,z},node)){distance=d;best=node;}
  }
  return best;
 }

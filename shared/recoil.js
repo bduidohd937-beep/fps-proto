@@ -21,7 +21,7 @@ export function getStance(player){
  if(player.grounded===false)return 'airborne';
  if(player.prone)return 'prone';
  if(player.crouch)return 'crouched';
- if(player.input?.sprint)return 'sprinting';
+ if(player.input?.sprint&&Math.hypot(Number(player.input?.forward)||0,Number(player.input?.strafe)||0)>.1)return 'sprinting';
  if(Math.hypot(Number(player.input?.forward)||0,Number(player.input?.strafe)||0)>.1)return 'walking';
  return 'standing';
 }

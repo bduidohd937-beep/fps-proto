@@ -64,7 +64,7 @@ test('server spread reduces with ADS and increases while airborne or sprinting',
  const aimed=getShotSpread(weapon,shooter());
  const hip=getShotSpread(weapon,{...shooter(),ads:false});
  const airborne=getShotSpread(weapon,{...shooter(),ads:false,grounded:false});
- const sprint=getShotSpread(weapon,{...shooter(),ads:false,input:{sprint:true}});
+ const sprint=getShotSpread(weapon,{...shooter(),ads:false,input:{sprint:true,forward:1}});
  assert.ok(aimed<hip);
  assert.ok(airborne>hip);
  assert.ok(sprint>hip);
