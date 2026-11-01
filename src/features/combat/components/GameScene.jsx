@@ -8,6 +8,8 @@ import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
 import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
 import {OPERATORS,DEFAULT_OPERATOR_ID} from '../../../../shared/operators.js';
 import {getVisualKick} from '../../../../shared/recoil.js';
+import {sensitivityForAim} from '../../settings/index.js';
+import {reconcilePrediction} from '../../../../shared/reconciliation.js';
 
 
 
@@ -139,7 +141,7 @@ function disposeRifle(weapon){
  weapon.traverse(obj=>{if(obj.isMesh){obj.geometry.dispose();materials.add(obj.material);}});
  materials.forEach(material=>material.dispose());
 }
-function PlayerController({player,status,socket,serverNow}){
+function PlayerController({player,status,socket,serverNow,sensitivity}){
  const {camera,gl,scene}=useThree();
  const target=useMemo(()=>new Vector3(),[]);
  const keys=useRef(new Set());
@@ -148,6 +150,8 @@ function PlayerController({player,status,socket,serverNow}){
   grounded:player.grounded!==false,crouch:!!player.crouch,prone:!!player.prone,jumpHeld:false
  });
  const yaw=useRef(player.yaw),pitch=useRef(player.pitch);
+ const sensitivityRef=useRef(sensitivity);
+ sensitivityRef.current=sensitivity;
  const sendTimer=useRef(0),fireTimer=useRef(0),bob=useRef(0),recoil=useRef(0),telemetry=useRef({x:player.x,y:player.y??0,z:player.z,serverX:player.x,serverY:player.y??0,serverZ:player.z,serverNow:serverNow??0,serverSpeed:0,time:performance.now()});
  const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false),proneToggle=useRef(false);
  const visibleWeapon=useRef(player.weaponId||DEFAULT_WEAPON_ID);
@@ -159,14 +163,18 @@ function PlayerController({player,status,socket,serverNow}){
   const lock=()=>{if(running.current&&document.pointerLockElement!==dom)dom.requestPointerLock?.();};
   const move=e=>{
    if(document.pointerLockElement!==dom||!running.current)return;
-   yaw.current-=e.movementX*.0022;
-   pitch.current=Math.max(-1.42,Math.min(1.42,pitch.current-e.movementY*.0022));
+   const multiplier=sensitivityForAim(sensitivityRef.current,aimHeld.current);
+   yaw.current-=e.movementX*.0022*multiplier;
+   pitch.current=Math.max(-1.42,Math.min(1.42,pitch.current-e.movementY*.0022*multiplier));
   };
   const keyDown=e=>{
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
    if(e.repeat&&(/^(Digit[1-4]|KeyR|KeyZ)$/.test(e.code)))return;
    keys.current.add(e.code);
-   if(e.code==='KeyZ'&&running.current)proneToggle.current=!proneToggle.current;
+   if(e.code==='KeyZ'&&running.current){
+    proneToggle.current=!proneToggle.current;
+    socket.emit('player:input',{forward:0,strafe:0,sprint:false,ads:false,jump:false,crouch:false,prone:proneToggle.current,yaw:yaw.current,pitch:pitch.current});
+   }
    if(!running.current)return;
    if(e.code==='KeyR')socket.emit('player:reload');
    const match=e.code.match(/^Digit([1-4])$/);
@@ -216,8 +224,10 @@ function PlayerController({player,status,socket,serverNow}){
   window.addEventListener('blur',loseFocus);
   socket.on('match:shot',onShot);socket.on('player:respawn',onRespawn);
   dom.dataset.controllerReady='true';
+  dom.dataset.inputReady='true';
   return ()=>{
    delete dom.dataset.controllerReady;
+   delete dom.dataset.inputReady;
    dom.removeEventListener('click',lock);
    document.removeEventListener('mousemove',move);
    document.removeEventListener('keydown',keyDown);
@@ -255,15 +265,7 @@ function PlayerController({player,status,socket,serverNow}){
   };
   if(running.current)local.current=movePlayer3D(local.current,input,dt);
   const predicted=local.current;
-  const dx=player.x-predicted.x,dy=(player.y??0)-predicted.y,dz=player.z-predicted.z;
-  if(dx*dx+dy*dy+dz*dz>16){
-   // Large remote correction, e.g. respawn, must not move the camera through world geometry.
-   predicted.x=player.x;predicted.y=player.y??0;predicted.z=player.z;predicted.vy=player.vy??0;
-   predicted.grounded=player.grounded!==false;predicted.crouch=!!player.crouch;predicted.prone=!!player.prone;
-  }else{
-   const blend=smoothingFactor(dt,8);
-   predicted.x+=dx*blend;predicted.y+=dy*blend;predicted.z+=dz*blend;
-  }
+  Object.assign(predicted,reconcilePrediction(predicted,player,dt));
   const walking=running.current&&(input.forward!==0||input.strafe!==0)&&predicted.grounded;
   if(walking)bob.current+=dt*(predicted.prone?4:input.sprint?16:input.crouch?7:10);
   const motion=walking?Math.sin(bob.current)*(predicted.prone?.006:input.sprint?.055:input.crouch?.014:.028):0;
@@ -279,7 +281,7 @@ function PlayerController({player,status,socket,serverNow}){
    const positionError=Math.hypot(player.x-predicted.x,(player.y??0)-predicted.y,player.z-predicted.z);
    telemetry.current={x:predicted.x,y:predicted.y,z:predicted.z,serverX:serverChanged?player.x:previous.serverX,serverY:serverChanged?(player.y??0):previous.serverY,serverZ:serverChanged?player.z:previous.serverZ,serverNow:serverChanged?(serverNow??previous.serverNow):previous.serverNow,serverSpeed,time:nowMs};
    const authoritativeEye=player.prone?PRONE_EYE:player.crouch?CROUCH_EYE:PLAYER_EYE;
-   domTelemetry(gl.domElement,{cameraEye:camera.position.y-predicted.y,serverEye:authoritativeEye,localSpeed,serverSpeed,positionError,serverY:player.y??0,predictedY:predicted.y});
+   domTelemetry(gl.domElement,{cameraEye:camera.position.y-predicted.y,serverEye:authoritativeEye,localSpeed,serverSpeed,positionError,serverY:player.y??0,predictedY:predicted.y,yaw:yaw.current,pitch:pitch.current});
   recoil.current=Math.max(0,recoil.current-dt*7);
   viewAds.current+=(Number(ads)-viewAds.current)*smoothingFactor(dt,12);
   const zoom=viewAds.current;
@@ -311,11 +313,11 @@ function domTelemetry(dom,values){
  if(!dom)return;
  for(const [key,value] of Object.entries(values))dom.dataset['acceptance'+key[0].toUpperCase()+key.slice(1)]=Number(value).toFixed(4);
 }
-export default function GameScene({me,enemy,status,socket,serverNow,quality='balanced'}){
+export default function GameScene({me,enemy,status,socket,serverNow,quality='balanced',sensitivity}){
  const preset=resolveQuality(quality);
  return <Canvas shadows={preset.shadows} camera={CAMERA_CONFIG} dpr={preset.dpr} frameloop={status==='playing'?'always':'demand'}>
   <FrontlineArena quality={quality}/>
   {enemy&&<Soldier player={enemy}/>}
-  {me&&socket&&<PlayerController key={me.id} player={me} status={status} socket={socket} serverNow={serverNow}/>}
+  {me&&socket&&<PlayerController key={me.id} player={me} status={status} socket={socket} serverNow={serverNow} sensitivity={sensitivity}/>} 
  </Canvas>;
 }

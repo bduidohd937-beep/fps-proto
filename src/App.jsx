@@ -7,6 +7,7 @@ import {GAME_PROTOCOL,GAME_VERSION} from '../shared/version.js';
 import {MAX_HP} from '../shared/rules.js';
 import {WEAPON_IDS,WEAPONS,DEFAULT_WEAPON_ID} from '../shared/weapons.js';
 import {DEFAULT_OPERATOR_ID,validOperator} from '../shared/operators.js';
+import {SettingsPanel,loadSensitivity,saveSensitivity} from './features/settings/index.js';
 
 export default function App(){
  const socketRef=useRef(null);
@@ -22,6 +23,9 @@ export default function App(){
  const [match,setMatch]=useState(null);
  const [message,setMessage]=useState('');
  const [graphicsQuality,setGraphicsQuality]=useState('balanced');
+ const [sensitivity,setSensitivity]=useState(loadSensitivity);
+ const [settingsOpen,setSettingsOpen]=useState(false);
+ const [networkPhase,setNetworkPhase]=useState('socket-init');
  const [roomPending,setRoomPending]=useState('');
  const [hitmarker,setHitmarker]=useState(false);
  const [headshot,setHeadshot]=useState(false);
@@ -32,6 +36,7 @@ export default function App(){
   const socket=io({reconnectionAttempts:10});socketRef.current=socket;
   let healthController=null;
   socket.on('connect',async ()=>{
+   setNetworkPhase('socket-connected');
    setConnected(false);
    setMessage('PROJECT DUEL 서버 버전을 확인하고 있습니다...');
    healthController?.abort();
@@ -47,6 +52,7 @@ export default function App(){
     }
     if(!socket.connected||controller.signal.aborted)return;
     setConnected(true);setMessage('');
+    setNetworkPhase('health-verified');
     socket.emit('operator:select',operatorRef.current,reply=>{
      if(reply&&!reply.ok)setMessage(reply.message||'오퍼레이터 선택에 실패했습니다.');
     });
@@ -57,20 +63,23 @@ export default function App(){
    }
   });
   socket.on('connect_error',()=>{
+   setNetworkPhase('socket-error');
    setConnected(false);setRoomPending('');
    setMessage('게임 서버에 연결할 수 없습니다. 서버 실행 상태를 확인해 주세요.');
   });
   socket.on('disconnect',()=>{
+   setNetworkPhase('disconnected');
    healthController?.abort();healthController=null;
    setConnected(false);setMessage('서버 연결이 끊겼습니다. 재접속 중입니다.');
    setMatch(null);setRoomCode('');setMyId('');setRoomPending('');
   });
   socket.on('room:ready',({code,playerId})=>{
+   setNetworkPhase('room-ready');
    setRoomCode(code);setMyId(playerId);lastHp.current=null;setMessage('');setRoomPending('');
   });
   socket.on('room:error',error=>{setRoomPending('');setMessage(error);});
   socket.on('room:message',setMessage);
-  socket.on('match:state',setMatch);
+  socket.on('match:state',state=>{setNetworkPhase(state.status==='playing'?'match-playing':`match-${state.status}`);setMatch(state);});
   socket.on('match:shot',({shooterId,targetId,zone})=>{
    if(shooterId===socket.id&&targetId){
     setHitmarker(true);
@@ -115,23 +124,28 @@ export default function App(){
   if(!socket?.connected||!connected)return setMessage('PROJECT DUEL 서버 연결이 확인되지 않았습니다. 개발 서버를 재시작해 주세요.');
   if(roomPending)return;
   setRoomPending(action);
+  setNetworkPhase(`room-${action}-requested`);
   setMessage(action==='solo'?'AI 대전 준비 중입니다...':action==='create'?'전장 생성 요청을 서버에 전송 중입니다...':'초대 코드 확인 및 입장 요청 중입니다...');
   const event=action==='solo'?'room:create-solo':action==='create'?'room:create':'room:join';
   const finish=(error,response)=>{
    setRoomPending('');
    if(error){
+    setNetworkPhase(`room-${action}-timeout`);
     setMessage('서버에서 7초 동안 방 생성/입장 응답이 없습니다. 서버를 재시작하고 페이지를 새로고침해 주세요.');
     return;
    }
    if(!response?.ok){
+    setNetworkPhase(`room-${action}-rejected`);
     setMessage(response?.message||'서버가 요청을 처리하지 못했습니다. 다시 시도해 주세요.');
     return;
    }
    if(!response.code||!response.playerId||!response.state){
+    setNetworkPhase(`room-${action}-invalid`);
     setMessage('서버 응답에 방 정보가 부족합니다. 최신 서버 코드로 재시작해 주세요.');
     return;
    }
    setRoomCode(response.code);
+   setNetworkPhase(`room-${action}-ack`);
    setMyId(response.playerId);
    setMatch(response.state);
    setMessage('');
@@ -172,15 +186,23 @@ export default function App(){
  const alive=me&&me.hp>0, reloading=me&&me.reloadAt>now;
  const respawning=me&&me.hp<=0&&match?.status==='playing';
  const gameActive=roomCode&&me&&match;
+ useEffect(()=>{
+  const onEscape=e=>{
+   if(e.key==='Escape'&&gameActive){e.preventDefault();setSettingsOpen(open=>!open);}
+  };
+  document.addEventListener('keydown',onEscape);
+  return ()=>document.removeEventListener('keydown',onEscape);
+ },[gameActive]);
  const won=match?.winnerId===myId;
  const weapon=WEAPONS[me?.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
- return <main className="app">
+ return <main className="app" data-network-phase={networkPhase}>
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
   {!gameActive?<MainMenu connected={connected} pending={roomPending} message={message}
    typedCode={typedCode} onCodeChange={setTypedCode} onJoin={joinRoom} onCreate={createRoom}
    onSolo={startSolo} operatorId={operatorId} onOperatorChange={chooseOperator}
-   quality={graphicsQuality} onQualityChange={setGraphicsQuality}/>:<section className="battle">
-   <GameScene me={me} enemy={enemy} status={match.status} serverNow={match.serverNow} socket={socketRef.current} quality={graphicsQuality}/>
+   quality={graphicsQuality} onQualityChange={setGraphicsQuality} sensitivity={sensitivity}
+   onSensitivityChange={value=>setSensitivity(saveSensitivity(value))}/>:<section className="battle">
+   <GameScene me={me} enemy={enemy} status={match.status} serverNow={match.serverNow} socket={socketRef.current} quality={graphicsQuality} sensitivity={sensitivity}/>
    <div className="battle-vignette"/>
    {damageFlash&&<div className="damage-flash"/>}
    <header className="battle-header">
@@ -245,6 +267,9 @@ export default function App(){
     <button className="primary" onClick={restart}>다시 대전</button>
     <button className="ghost" onClick={leaveRoom}>방 나가기</button>
    </div></div>}
+   {settingsOpen&&<div className="modal-overlay settings-overlay" onMouseDown={e=>e.stopPropagation()}><SettingsPanel value={sensitivity}
+    onChange={value=>setSensitivity(saveSensitivity(value))} onReset={value=>setSensitivity(saveSensitivity(value))}
+    onClose={()=>setSettingsOpen(false)}/></div>}
   </section>}
  </main>;
 }

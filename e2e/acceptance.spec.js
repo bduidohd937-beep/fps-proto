@@ -8,6 +8,8 @@ test('browser measures authoritative posture camera heights, speeds and position
  await expect(page.locator('.scoreboard')).toBeVisible();
  const canvas=page.locator('canvas').first();
  await expect(canvas).toHaveAttribute('data-controller-ready','true');
+ await expect(canvas).toHaveAttribute('data-input-ready','true');
+ await page.bringToFront();
  await page.keyboard.press('F3');
 
  const sample=async(stance,key,speedRange,eye)=>{
