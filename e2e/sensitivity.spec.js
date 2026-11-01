@@ -56,6 +56,8 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
  await expect(canvas).toHaveAttribute('data-acceptance-aim','general');
  const before=Number(await canvas.getAttribute('data-acceptance-yaw'));
  await page.mouse.move(centerX+120,centerY,{steps:10});
+ await page.mouse.move(centerX+240,centerY,{steps:10});
+ await expect.poll(()=>Number(canvas.getAttribute('data-acceptance-mouse-events'))).toBeGreaterThan(0);
  await expectYawChange(before,'general');
  const generalInput=Math.abs((await readInput()).movementX);
  const generalState=await readInput();
@@ -74,6 +76,8 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
  const adsBefore=Number(await canvas.getAttribute('data-acceptance-yaw'));
  const adsInputBefore=(await readInput()).movementX;
  await page.mouse.move(centerX+220,centerY,{steps:10});
+ await page.mouse.move(centerX+320,centerY,{steps:10});
+ await expect.poll(()=>Number(canvas.getAttribute('data-acceptance-mouse-events'))).toBeGreaterThan(0);
  await expectYawChange(adsBefore,'ads');
  const adsInput=Math.abs((await readInput()).movementX-adsInputBefore);
  const adsState=await readInput();
