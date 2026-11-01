@@ -180,7 +180,7 @@ export default function App(){
    typedCode={typedCode} onCodeChange={setTypedCode} onJoin={joinRoom} onCreate={createRoom}
    onSolo={startSolo} operatorId={operatorId} onOperatorChange={chooseOperator}
    quality={graphicsQuality} onQualityChange={setGraphicsQuality}/>:<section className="battle">
-   <GameScene me={me} enemy={enemy} status={match.status} socket={socketRef.current} quality={graphicsQuality}/>
+   <GameScene me={me} enemy={enemy} status={match.status} serverNow={match.serverNow} socket={socketRef.current} quality={graphicsQuality}/>
    <div className="battle-vignette"/>
    {damageFlash&&<div className="damage-flash"/>}
    <header className="battle-header">
