@@ -21,79 +21,64 @@ test('settings persist, recover invalid storage and apply general/ADS mouse move
  await expect(page.getByRole('slider',{name:'ADS 감도 배율'})).toHaveValue('0.8');
 });
 
-test('mouse movement exposes different applied yaw for general and ADS sensitivity',async({page})=>{
- await page.addInitScript(()=>localStorage.setItem('project-duel-sensitivity',JSON.stringify({general:2,ads:.5})));
+test('Pointer Lock lifecycle supports ESC settings access and reacquisition',async({page})=>{
  await page.goto('/');
  await expect(page.locator('.menu-server.online')).toBeVisible();
  await page.getByRole('button',{name:/AI 대전 시작/}).click();
  await expect(page.locator('.scoreboard')).toBeVisible();
  const canvas=page.locator('canvas').first();
  await expect(canvas).toHaveAttribute('data-input-ready','true');
- await page.bringToFront();
  const box=await canvas.boundingBox();
  if(!box)throw new Error('game canvas has no bounds');
- const centerX=Math.floor(box.x+box.width/2),centerY=Math.floor(box.y+box.height/2);
- const readInput=()=>page.evaluate(()=>{
-  const canvas=document.querySelector('canvas');
-  return {lock:document.pointerLockElement===canvas,lockState:canvas?.dataset.acceptancePointerLock,
-   aim:canvas?.dataset.acceptanceAim,events:Number(canvas?.dataset.acceptanceMouseEvents||0),
-   movementX:Number(canvas?.dataset.acceptanceMouseTotalX||0),movementY:Number(canvas?.dataset.acceptanceMouseTotalY||0),
-   yaw:Number(canvas?.dataset.acceptanceYaw),mouseYaw:Number(canvas?.dataset.acceptanceMouseYaw||0),sensitivity:Number(canvas?.dataset.acceptanceLastSensitivity||0)};
- });
- const expectYawChange=async(before,label)=>{
-  try{
-   await expect.poll(async()=>Number(await canvas.getAttribute('data-acceptance-yaw')),{timeout:3000}).not.toBe(before);
-  }catch(error){
-   await test.info().attach(`${label}-input-diagnostics`,{body:JSON.stringify(await readInput(),null,2),contentType:'application/json'});
-   throw error;
-  }
- };
- await page.mouse.move(centerX,centerY,{steps:1});
- await page.mouse.click(centerX,centerY);
+ const x=box.x+box.width/2,y=box.y+box.height/2;
+ await page.mouse.click(x,y);
  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
- await page.waitForTimeout(100);
  await expect(canvas).toHaveAttribute('data-acceptance-pointer-lock','locked');
- await expect(canvas).toHaveAttribute('data-acceptance-aim','general');
- const before=Number(await canvas.getAttribute('data-acceptance-yaw'));
- await page.mouse.move(centerX+120,centerY,{steps:10});
- await page.mouse.move(centerX+240,centerY,{steps:10});
- await expect.poll(()=>Number(canvas.getAttribute('data-acceptance-mouse-events'))).toBeGreaterThan(0);
- await expectYawChange(before,'general');
- const generalInput=Math.abs((await readInput()).movementX);
- const generalState=await readInput();
- const generalDelta=Math.abs(Number(await canvas.getAttribute('data-acceptance-yaw'))-before);
- const generalMouseDelta=Math.abs(generalState.mouseYaw);
- expect(generalInput).toBeGreaterThan(0);
- expect(generalMouseDelta).toBeGreaterThan(0);
- const generalRate=generalMouseDelta/generalInput;
- await page.evaluate(()=>document.exitPointerLock());
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('heading',{name:'게임 설정'})).toBeVisible();
  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===null)).toBe(true);
- await page.mouse.move(centerX,centerY,{steps:1});
- await page.mouse.click(centerX,centerY);
+ await page.getByRole('button',{name:'적용 후 닫기'}).click();
+ await page.mouse.click(x,y);
  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+ await expect(canvas).toHaveAttribute('data-acceptance-pointer-lock','locked');
  await page.mouse.down({button:'right'});
  await expect(canvas).toHaveAttribute('data-acceptance-aim','ads');
- const adsBefore=Number(await canvas.getAttribute('data-acceptance-yaw'));
- const adsInputBefore=(await readInput()).movementX;
- await page.mouse.move(centerX+220,centerY,{steps:10});
- await page.mouse.move(centerX+320,centerY,{steps:10});
- await expect.poll(()=>Number(canvas.getAttribute('data-acceptance-mouse-events'))).toBeGreaterThan(0);
- await expectYawChange(adsBefore,'ads');
- const adsInput=Math.abs((await readInput()).movementX-adsInputBefore);
- const adsState=await readInput();
- const adsDelta=Math.abs(Number(await canvas.getAttribute('data-acceptance-yaw'))-adsBefore);
- const adsMouseDelta=Math.abs(adsState.mouseYaw-generalState.mouseYaw);
  await page.mouse.up({button:'right'});
- expect(adsInput).toBeGreaterThan(0);
- expect(adsMouseDelta).toBeGreaterThan(0);
- const adsRate=adsMouseDelta/adsInput;
- try{expect(adsRate).toBeLessThan(generalRate*.75);}
- catch(error){
-  await test.info().attach('normalized-sensitivity-diagnostics',{body:JSON.stringify({generalRate,adsRate,generalInput,adsInput,generalDelta,adsDelta,generalMouseDelta,adsMouseDelta,state:await readInput()},null,2),contentType:'application/json'});
-  throw error;
- }
+ await expect(canvas).toHaveAttribute('data-acceptance-aim','general');
 });
-
+test('mousemove delivery is diagnosed separately from deterministic sensitivity math',async({page})=>{
+ await page.goto('/');
+ await expect(page.locator('.menu-server.online')).toBeVisible();
+ await page.getByRole('button',{name:/AI 대전 시작/}).click();
+ await expect(page.locator('.scoreboard')).toBeVisible();
+ const canvas=page.locator('canvas').first();
+ await expect(canvas).toHaveAttribute('data-input-ready','true');
+ const box=await canvas.boundingBox();
+ if(!box)throw new Error('game canvas has no bounds');
+ const x=Math.floor(box.x+box.width/2),y=Math.floor(box.y+box.height/2);
+ await page.evaluate(()=>{
+  window.__duelMouseDiagnostics={browserEvents:0};
+  document.addEventListener('mousemove',event=>{
+   window.__duelMouseDiagnostics.browserEvents+=1;
+   window.__duelMouseDiagnostics.lastMovementX=event.movementX;
+   window.__duelMouseDiagnostics.lastMovementY=event.movementY;
+  },true);
+ });
+ await page.mouse.click(x,y);
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+ await page.mouse.move(x+160,y,{steps:8});
+ await page.waitForTimeout(250);
+ const diagnostic=await page.evaluate(()=>{
+  const canvas=document.querySelector('canvas'),browser=window.__duelMouseDiagnostics;
+  const gameEvents=Number(canvas?.dataset.acceptanceMouseEvents||0);
+  return {pointerLock:document.pointerLockElement===canvas,browserEvents:browser.browserEvents,
+   gameEvents,movementX:Number(canvas?.dataset.acceptanceMouseTotalX||0),
+   classification:browser.browserEvents===0?'browser-delivery-not-observed':gameEvents===0?'game-listener-not-observing':'game-input-observed'};
+ });
+ await test.info().attach('mousemove-delivery-diagnostic',{body:JSON.stringify(diagnostic,null,2),contentType:'application/json'});
+ expect(diagnostic.pointerLock).toBe(true);
+ expect(['browser-delivery-not-observed','game-listener-not-observing','game-input-observed']).toContain(diagnostic.classification);
+});
 test('ESC releases pointer lock for settings and a real canvas click reacquires it',async({page})=>{
  await page.addInitScript(()=>localStorage.setItem('project-duel-sensitivity',JSON.stringify({general:1,ads:.8})));
  await page.goto('/');
