@@ -6,6 +6,7 @@ import {smoothingFactor,shortestAngleDelta} from '../utils/renderSmoothing.js';
 import {FrontlineArena} from '../../arena/index.js';
 import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
 import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
+import {OPERATORS,DEFAULT_OPERATOR_ID} from '../../../../shared/operators.js';
 
 
 
@@ -30,11 +31,12 @@ function Soldier({player}){
  });
  if(!player||player.hp<=0)return null;
  const crouchScale=player.crouch?0.67:1;
+ const uniform=OPERATORS[player.operatorId]?.color||OPERATORS[DEFAULT_OPERATOR_ID].color;
  return <group ref={visual} position={origin.position} rotation={origin.rotation}>
   <group scale={[1,crouchScale,1]}>
    <mesh position={[0,1.03,0]} castShadow>
     <capsuleGeometry args={[.34,.53,6,10]}/>
-    <meshStandardMaterial color="#485c56" metalness={.23} roughness={.87}/>
+    <meshStandardMaterial color={uniform} metalness={.23} roughness={.87}/>
    </mesh>
    <mesh position={[0,1.63,0]} castShadow>
     <sphereGeometry args={[.25,12,12]}/>
@@ -51,7 +53,7 @@ function Soldier({player}){
    {[-.28,.28].map(x=><group key={'limb'+x}>
     <mesh position={[x,1.05,-.02]} rotation={[.18,0,x>0?-.18:.18]} castShadow>
      <capsuleGeometry args={[.105,.38,5,8]}/>
-     <meshStandardMaterial color="#55645c" metalness={.21} roughness={.84}/>
+     <meshStandardMaterial color={uniform} metalness={.21} roughness={.84}/>
     </mesh>
     <mesh position={[x*.67,.39,.01]} castShadow>
      <capsuleGeometry args={[.145,.57,5,8]}/>

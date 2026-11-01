@@ -10,7 +10,7 @@ import {inspectArchitecture} from '../scripts/check-architecture.mjs';
 test('client and server share the same version and protocol declarations',()=>{
  const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
  assert.equal(pkg.version,GAME_VERSION);
- assert.equal(GAME_PROTOCOL,4);
+ assert.equal(GAME_PROTOCOL,5);
  assert.equal(GAME_SERVICE,'project-duel');
 });
 test('stable quality profiles share low-shadow policy and immutable DPR ranges',()=>{

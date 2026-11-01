@@ -43,8 +43,8 @@ test('two clients can create, join, shoot, reject third player and disconnect',a
  const health=await (await fetch(url+'/api/health')).json();
  assert.equal(health.ok,true);
  assert.equal(health.service,'project-duel');
- assert.equal(health.protocol,4);
- assert.equal(health.version,'0.2.3');
+ assert.equal(health.protocol,5);
+ assert.equal(health.version,'0.3.0');
  const one=io(url,{transports:['websocket'],reconnection:false});
  clients.push(one);
  await waitFor(one,'connect');

@@ -1,14 +1,20 @@
 import {useEffect,useRef,useState} from 'react';
 import {io} from 'socket.io-client';
 import {GameScene} from './features/combat/index.js';
-import {GraphicsQualitySelect} from './features/lobby/index.js';
+import {MainMenu} from './features/lobby/index.js';
 import {useBattleClock} from './features/match/index.js';
 import {GAME_PROTOCOL,GAME_VERSION} from '../shared/version.js';
 import {MAX_HP} from '../shared/rules.js';
 import {WEAPON_IDS,WEAPONS,DEFAULT_WEAPON_ID} from '../shared/weapons.js';
+import {DEFAULT_OPERATOR_ID,validOperator} from '../shared/operators.js';
 
 export default function App(){
  const socketRef=useRef(null);
+ const [operatorId,setOperatorId]=useState(()=>{
+  try{return validOperator(window.localStorage.getItem('duel-operator'));}
+  catch{return DEFAULT_OPERATOR_ID;}
+ });
+ const operatorRef=useRef(operatorId);
  const [connected,setConnected]=useState(false);
  const [myId,setMyId]=useState('');
  const [roomCode,setRoomCode]=useState('');
@@ -37,6 +43,9 @@ export default function App(){
     }
     if(!socket.connected)return;
     setConnected(true);setMessage('');
+    socket.emit('operator:select',operatorRef.current,reply=>{
+     if(reply&&!reply.ok)setMessage(reply.message||'오퍼레이터 선택에 실패했습니다.');
+    });
    }catch{
     if(socket.connected)setMessage('게임 서버 상태 확인에 실패했습니다. 기존 서버를 종료하고 npm run dev를 다시 실행해 주세요.');
    }finally{
@@ -80,13 +89,24 @@ export default function App(){
   }
   lastHp.current=me.hp;
  },[me?.hp,me?.id]);
+ const chooseOperator=id=>{
+  const validated=validOperator(id);
+  operatorRef.current=validated;
+  setOperatorId(validated);
+  try{window.localStorage.setItem('duel-operator',validated);}catch{}
+  if(socketRef.current?.connected&&connected){
+   socketRef.current.emit('operator:select',validated,reply=>{
+    if(reply&&!reply.ok)setMessage(reply.message||'오퍼레이터를 바꿀 수 없습니다.');
+   });
+  }
+ };
  const requestRoom=(action,code)=>{
   const socket=socketRef.current;
   if(!socket?.connected||!connected)return setMessage('PROJECT DUEL 서버 연결이 확인되지 않았습니다. 개발 서버를 재시작해 주세요.');
   if(roomPending)return;
   setRoomPending(action);
-  setMessage(action==='create'?'전장 생성 요청을 서버에 전송 중입니다...':'초대 코드 확인 및 입장 요청 중입니다...');
-  const event=action==='create'?'room:create':'room:join';
+  setMessage(action==='solo'?'AI 대전 준비 중입니다...':action==='create'?'전장 생성 요청을 서버에 전송 중입니다...':'초대 코드 확인 및 입장 요청 중입니다...');
+  const event=action==='solo'?'room:create-solo':action==='create'?'room:create':'room:join';
   const finish=(error,response)=>{
    setRoomPending('');
    if(error){
@@ -107,9 +127,11 @@ export default function App(){
    setMessage('');
   };
   if(action==='create')socket.timeout(7000).emit(event,finish);
+  else if(action==='solo')socket.timeout(7000).emit(event,{difficulty:code},finish);
   else socket.timeout(7000).emit(event,code,finish);
  };
  const createRoom=()=>requestRoom('create');
+ const startSolo=(difficulty='rookie')=>requestRoom('solo',difficulty);
  const joinRoom=e=>{
   e.preventDefault();
   const code=typedCode.replace(/[^A-Z0-9]/gi,'').toUpperCase();
@@ -144,44 +166,10 @@ export default function App(){
  const weapon=WEAPONS[me?.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
  return <main className="app">
   <div className="ambient ambient-a"/><div className="ambient ambient-b"/>
-  {!gameActive?<section className="lobby">
-   <div className="eyebrow"><span className="live-dot"/> BROWSER ARENA · FRONTLINE · V0.2.3</div>
-   <h1>PROJECT <span className="glow">DUEL</span></h1>
-   <p className="subtitle">군수기지 IRON DEPOT에서 벌이는 설치 없는 온라인 1대1 FPS.</p>
-   <div className="lobby-grid">
-    <div className="pane main-pane">
-     <div className="pane-kicker">01 / HOST</div>
-     <h2>새로운 전장 열기</h2>
-     <p>방을 만들고 생성된 초대 코드를 친구에게 보내.</p>
-     <button type="button" className="primary big" disabled={!connected||!!roomPending} onClick={createRoom}>{roomPending==='create'?'전장 생성 중...':'+ 전장 생성'}</button>
-    </div>
-    <form className="pane" onSubmit={joinRoom}>
-     <div className="pane-kicker">02 / JOIN</div>
-     <h2>친구 전장 참가</h2>
-     <p>받은 6자리 코드를 입력하고 대전에 참여해.</p>
-     <div className="join-row">
-      <input aria-label="초대 코드" maxLength={6} value={typedCode}
-       onChange={e=>setTypedCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} placeholder="ABC123"/>
-      <button className="secondary" disabled={!connected||!!roomPending} type="submit">{roomPending==='join'?'입장 중...':'입장'}</button>
-     </div>
-    </form>
-   </div>
-   <GraphicsQualitySelect value={graphicsQuality} onChange={setGraphicsQuality}/>
-   <div className="instructions">
-    <span><kbd>W A S D</kbd> 이동</span>
-    <span><kbd>SHIFT</kbd> 전력질주</span>
-    <span><kbd>SPACE</kbd> 점프</span>
-    <span><kbd>CTRL / C</kbd> 앉기</span>
-    <span><kbd>우클릭</kbd> 정조준 ADS</span>
-    <span><kbd>좌클릭</kbd> 사격</span>
-    <span><kbd>1~4</kbd> 무기 변경</span>
-    <span><kbd>R</kbd> 장전</span>
-    <span><kbd>ESC</kbd> 커서 해제</span>
-   </div>
-   <p className="connection"><span className={connected?'green-dot':'red-dot'}/>
-    {connected?'게임 서버 연결됨':'서버 연결 중...'}</p>
-   {message&&<div className="notice" role="status">{message}</div>}
-  </section>:<section className="battle">
+  {!gameActive?<MainMenu connected={connected} pending={roomPending} message={message}
+   typedCode={typedCode} onCodeChange={setTypedCode} onJoin={joinRoom} onCreate={createRoom}
+   onSolo={startSolo} operatorId={operatorId} onOperatorChange={chooseOperator}
+   quality={graphicsQuality} onQualityChange={setGraphicsQuality}/>:<section className="battle">
    <GameScene me={me} enemy={enemy} status={match.status} socket={socketRef.current} quality={graphicsQuality}/>
    <div className="battle-vignette"/>
    {damageFlash&&<div className="damage-flash"/>}
@@ -190,10 +178,10 @@ export default function App(){
     <div className="scoreboard">
      <div className="score blue-score"><small>YOU</small><strong>{me.kills}</strong></div>
      <div className="score-mid"><span>FIRST TO {match.targetKills}</span><b>VS</b></div>
-     <div className="score red-score"><strong>{enemy?.kills??0}</strong><small>RIVAL</small></div>
+     <div className="score red-score"><strong>{enemy?.kills??0}</strong><small>{enemy?.bot?'BOT':'RIVAL'}</small></div>
     </div>
-    <div className="room-label">ROOM <strong>{roomCode}</strong>
-     <button className="text-button" onClick={copyInvite}>초대 링크</button>
+    <div className="room-label">{match.mode==='solo'?'SOLO / BOT':'ROOM'} <strong>{match.mode==='solo'?match.difficulty==='regular'?'정규병':'신병':roomCode}</strong>
+     {match.mode!=='solo'&&<button className="text-button" onClick={copyInvite}>초대 링크</button>}
     </div>
    </header>
    {match.status==='playing'&&alive&&<div className={'crosshair '+(hitmarker?'hit ':'')+(me.ads?'ads':'')}>
@@ -230,6 +218,9 @@ export default function App(){
     <h2>친구를 기다리는 중</h2><p>친구가 접속하면 자동으로 시작돼.</p>
     <div className="invite-code">{roomCode}</div>
     <button className="primary" onClick={copyInvite}>초대 링크 복사</button>
+    <button className="secondary" onClick={()=>startSolo('rookie')} disabled={!!roomPending}>
+     {roomPending==='solo'?'AI 전장 준비 중...':'친구 대신 AI와 바로 플레이'}
+    </button>
     <button className="ghost" onClick={leaveRoom}>방 나가기</button>
    </div></div>}
    {respawning&&<div className="death-overlay"><div>ELIMINATED</div>
