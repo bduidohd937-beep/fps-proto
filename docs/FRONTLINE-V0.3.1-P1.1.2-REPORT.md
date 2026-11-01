@@ -14,6 +14,8 @@ The game input path itself was not bypassed or disabled. The test now performs a
 
 The next CI run also exposed that the visible yaw stream can include legitimate server shot recoil while the bot is active. The test now compares the mouse-applied yaw contribution separately, while still requiring visible yaw movement and preserving both values in diagnostics. This prevents recoil from being misreported as a sensitivity failure.
 
+That run also caught an independent acceptance-test race: the prone key was sent before the preceding crouch state had visibly returned to standing. The acceptance test now waits for the authoritative standing state before toggling prone; it does not retry or skip the posture assertion.
+
 During the required ESC regression check, a second real defect was found: the global game Escape handler called `preventDefault()`, interfering with browser Pointer Lock release. The handler now explicitly exits Pointer Lock before opening or closing the settings overlay.
 
 ## Changes
