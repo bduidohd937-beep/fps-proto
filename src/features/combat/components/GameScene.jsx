@@ -1,13 +1,13 @@
 import {useEffect,useMemo,useRef} from 'react';
 import {Canvas,useFrame,useThree} from '@react-three/fiber';
 import {Vector3,Group,Mesh,BoxGeometry,MeshStandardMaterial} from 'three';
-import {PLAYER_EYE,CROUCH_EYE,movePlayer3D} from '../../shared/rules.js';
-import {smoothingFactor,shortestAngleDelta} from '../game/renderSmoothing.js';
-import {FrontlineArena} from './FrontlineArena.jsx';
-import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../shared/weapons.js';
+import {PLAYER_EYE,CROUCH_EYE,movePlayer3D} from '../../../../shared/rules.js';
+import {smoothingFactor,shortestAngleDelta} from '../utils/renderSmoothing.js';
+import {FrontlineArena} from '../../arena/index.js';
+import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
+import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
 
-const QUALITY_DPR={low:[.75,1],balanced:[1,1.25],high:[1,1.6]};
-const CAMERA_CONFIG={fov:78,near:.06,far:110};
+
 
 function Soldier({player}){
  const visual=useRef(null);
@@ -267,7 +267,8 @@ function PlayerController({player,status,socket}){
  return null;
 }
 export default function GameScene({me,enemy,status,socket,quality='balanced'}){
- return <Canvas shadows={quality!=='low'} camera={CAMERA_CONFIG} dpr={QUALITY_DPR[quality]||QUALITY_DPR.balanced}>
+ const preset=resolveQuality(quality);
+ return <Canvas shadows={preset.shadows} camera={CAMERA_CONFIG} dpr={preset.dpr}>
   <FrontlineArena quality={quality}/>
   {enemy&&<Soldier player={enemy}/>}
   {me&&socket&&<PlayerController key={me.id} player={me} status={status} socket={socket}/>}

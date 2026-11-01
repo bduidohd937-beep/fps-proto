@@ -8,15 +8,15 @@ import {Server} from 'socket.io';
 import {MAX_HP,KILLS_TO_WIN,RESPAWN_MS,SPAWNS,clamp,movePlayer3D} from '../shared/rules.js';
 import {DEFAULT_WEAPON_ID,getWeapon,createMagazines} from '../shared/weapons.js';
 import {traceShot,computeDamage,getShotSpread} from '../shared/combat.js';
+import {GAME_SERVICE,GAME_VERSION,GAME_PROTOCOL} from '../shared/version.js';
+import {newPlayer,publicState} from './domain/players.js';
 
 const app=express(),server=http.createServer(app);
 const io=new Server(server,{maxHttpBufferSize:8192});
 const rooms=new Map(),socketRooms=new Map();
 const ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TICK_MS=1000/30, SNAPSHOT_EVERY=2;
-const GAME_SERVICE = 'project-duel';
-const GAME_PROTOCOL = 4;
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:GAME_SERVICE,protocol:GAME_PROTOCOL,version:'0.2.3',rooms:rooms.size}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:GAME_SERVICE,protocol:GAME_PROTOCOL,version:GAME_VERSION,rooms:rooms.size}));
 const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 if(existsSync(dist)){
  app.use(express.static(dist));
@@ -25,19 +25,6 @@ if(existsSync(dist)){
 function roomCode(){
  let code;do{code=Array.from({length:6},()=>ALPHABET[randomInt(ALPHABET.length)]).join('');}while(rooms.has(code));
  return code;
-}
-function newPlayer(socket,index){
- const spawn=SPAWNS[index],magazines=createMagazines();
- return {id:socket.id,name:index===0?'BLUE':'RED',x:spawn.x,y:spawn.y,z:spawn.z,vy:0,grounded:true,crouch:false,jumpHeld:false,yaw:spawn.yaw,pitch:0,
-  hp:MAX_HP,ammo:magazines[DEFAULT_WEAPON_ID],weaponId:DEFAULT_WEAPON_ID,magazines,
-  ads:false,bloom:0,shotsFired:0,switchUntil:0,reloadWeaponId:null,
-  kills:0,deaths:0,respawnAt:0,reloadAt:0,lastFireAt:0,
-  input:{forward:0,strafe:0,sprint:false,jump:false,crouch:false},lastInputAt:Date.now()};
-}
-function publicState(room){
- return {code:room.code,status:room.status,winnerId:room.winnerId,serverNow:Date.now(),targetKills:KILLS_TO_WIN,
-  players:room.players.map(({id,name,x,y,z,vy,grounded,crouch,yaw,pitch,hp,ammo,weaponId,ads,kills,deaths,respawnAt,reloadAt})=>
-   ({id,name,x,y,z,vy,grounded,crouch,yaw,pitch,hp,ammo,weaponId,ads,kills,deaths,respawnAt,reloadAt}))};
 }
 function broadcast(room){io.to(room.code).emit('match:state',publicState(room));}
 function resetMatch(room){

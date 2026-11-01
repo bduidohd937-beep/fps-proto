@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {smoothingFactor,shortestAngleDelta} from '../src/game/renderSmoothing.js';
+import {smoothingFactor,shortestAngleDelta} from '../src/features/combat/utils/renderSmoothing.js';
 test('frame damping stays in [0, 1]',()=>{
  for(const dt of [-1,0,.016,.033,.1,1,100]){
   const v=smoothingFactor(dt);assert.ok(v>=0&&v<=1);
