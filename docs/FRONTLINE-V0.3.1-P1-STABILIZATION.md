@@ -57,6 +57,6 @@ Environment: Windows, Node v24.21.0, npm 11.19.0, Playwright Chromium 156.0.8078
 - Final `npm run check`: 86/86 tests passed, architecture passed, production build passed (existing chunk warning retained).
 - Final `npx playwright test --repeat-each=2`: 20/20 passed in 1.6 minutes, zero retries. Includes two successful friend-join cycles and both difficulties twice.
 - Earlier investigative browser runs: baseline friend health timeout reproduced; intermediate run had 2 failures/8 passes (input handler readiness and concurrent development reload during investigation). These were not counted as successful validation.
-- Dedicated five-repeat friend/low-graphics suite: pending.
-- Hosted CI: pending new branch push. Local passing results do not certify hosted CI.
+- Dedicated five-repeat friend/low-graphics suite: 10/10 passed in 1.2 minutes (five successful friend joins, five low-graphics creates).
+- Hosted CI for implementation commit `0a73d24`: run 41272917944, test-and-build passed; browser-smoke was running when this report was updated. Consult the PR checks for the final hosted result.
 - Do not treat this draft as a full P1 stability certification; the scope limitations above remain open.
