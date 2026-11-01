@@ -23,16 +23,19 @@ test('browser can create a room and a second client can join',async ({page,brows
   await expect(page.locator('.scoreboard')).toBeVisible();
   // Weapon slot is a real server-side inventory change, not just a visual highlight.
   await expect(page.getByRole('button',{name:'AR-4 장착'})).toHaveClass(/selected/);
-  await expect(page.locator('canvas')).toHaveAttribute('data-controller-ready','true');
-  await page.keyboard.press('Digit2');
+  const hostCanvas=page.locator('canvas').first();
+  await expect(hostCanvas).toHaveAttribute('data-controller-ready','true');
+  await expect(hostCanvas).toHaveAttribute('data-input-ready','true');
+  await page.bringToFront();
+  await page.getByRole('button',{name:'VXR-9 장착'}).click();
   await expect(page.getByRole('button',{name:'VXR-9 장착'})).toHaveClass(/selected/);
   await expect(page.locator('.hud-module.ammo')).toContainText('VXR-9');
   await expect(page.locator('.hud-module.ammo')).toContainText('36');
-  await page.keyboard.press('Digit3');
+  await page.getByRole('button',{name:'MKR-12 장착'}).click();
   await expect(page.getByRole('button',{name:'MKR-12 장착'})).toHaveClass(/selected/);
-  await page.keyboard.press('Digit4');
+  await page.getByRole('button',{name:'BR-7 장착'}).click();
   await expect(page.getByRole('button',{name:'BR-7 장착'})).toHaveClass(/selected/);
-  await page.keyboard.press('Digit1');
+  await page.getByRole('button',{name:'AR-4 장착'}).click();
   await expect(page.getByRole('button',{name:'AR-4 장착'})).toHaveClass(/selected/);
   // Real browser control must create actual server height, not a visual camera-only jump.
   await page.keyboard.down('Space');
