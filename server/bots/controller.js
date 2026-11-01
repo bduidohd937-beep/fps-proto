@@ -89,7 +89,7 @@ export function decideBot(bot,target,brain,now=Date.now(),random=Math.random,dif
  const strafeAngle=moving?desiredYaw-yaw:0;
  const input={
   forward:moving?Math.cos(strafeAngle):0,
-  strafe:moving?Math.sin(strafeAngle):0,
+  strafe:moving?-Math.sin(strafeAngle):0,
   sprint:brain.mode!=='engage'&&d>15,
   jump:false,crouch:false
  };
