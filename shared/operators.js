@@ -7,5 +7,5 @@ export const OPERATORS=Object.freeze({
  'bulwark':Object.freeze({id:'bulwark',name:'BULWARK',role:'지원병',tag:'SUPPORT',color:'#9c8874',secondary:'#51443c',description:'탄약과 보급을 책임지는 지원병.',futurePerk:'재장전 속도 조정 후보'}),
  'hawkeye':Object.freeze({id:'hawkeye',name:'HAWKEYE',role:'사수',tag:'MARKSMAN',color:'#82948a',secondary:'#4b5549',description:'원거리 관측과 정밀 사격을 선호하는 사수.',futurePerk:'정조준 안정성 조정 후보'})
 });
-export const getOperator=id=>OPERATORS[id]??null;
+export const getOperator=id=>typeof id==='string'&&Object.hasOwn(OPERATORS,id)?OPERATORS[id]:null;
 export const validOperator=id=>getOperator(id)?.id??DEFAULT_OPERATOR_ID;

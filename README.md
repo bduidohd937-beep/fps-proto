@@ -169,3 +169,36 @@ Builds on V0.2.3, preserving protocol 4, game rules, all 4 weapons and existing 
 - Baseline vs local old V0.1.3 screenshot: `docs/FRONTLINE-V0.3-P0-AUDIT.md`.
 
 No V0.3.0 main UI, bots, operator perks or new assets are implemented as part of P0.
+
+
+---
+
+## FRONTLINE REFORGED V0.3.0 P1+P2 developer preview
+
+**Branch:** `feat/frontline-v0.3.0-p1-p2-lobby-solo` (independent preview, does not deploy to Render automatically).
+
+- Cinematic olive/charcoal military operations lobby with 3D operator preview.
+- `솔로 플레이` → choose rookie/regular bot → `AI 대전 시작` creates a server-authoritative match immediately; no friend required.
+- `친구 대전` preserves 6-character private room invites. Waiting screen can switch to solo bot immediately. Solo invite codes cannot be joined by other sockets.
+- `오퍼레이터` selector shows four cosmetic operators; character preview changes and choice is stored in the current browser. **No character combat bonuses yet**; all operators share the same combat stats/hitboxes.
+- `무기고` displays available four guns; weapon changes remain 1–4 during live combat.
+- Bot FSM uses patrol/search/alert/engage, simple cached 2D navigation for ground obstacles, line-of-sight-based targeting, real shared server shooting/reload rules, and two difficulty presets.
+- Existing ONLINE 1v1, four weapons, jumping/crouch and IRON DEPOT remain intact.
+
+### Run
+```powershell
+git fetch origin
+git switch feat/frontline-v0.3.0-p1-p2-lobby-solo
+git pull --ff-only origin feat/frontline-v0.3.0-p1-p2-lobby-solo
+npm install
+npm run dev
+```
+
+### Tests
+```bash
+npm run check
+npm run test:e2e
+npm run doctor
+```
+
+**Limitations:** AI pathfinding is first-pass ground grid routing, not a production navmesh; 2F traversal AI, advanced cooperative mode, permanent accounts, real matchmaking, operator stat perks and polished external character asset files are excluded. Real laptop gameplay/FPS and wide-area online latency need manual playtesting before Render deployment.

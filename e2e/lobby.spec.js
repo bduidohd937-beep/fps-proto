@@ -4,7 +4,8 @@ test('browser can create a room and a second client can join',async ({page,brows
  const errors=[];
  page.on('pageerror',error=>errors.push('host: '+error.message));
  await page.goto('/');
- await expect(page.getByText('게임 서버 연결됨')).toBeVisible();
+ await expect(page.locator('.menu-server.online')).toBeVisible();
+ await page.getByRole('button',{name:/친구 대전/}).click();
  await expect(page.getByRole('button',{name:'전장 생성',exact:false})).toBeEnabled();
  await page.getByRole('button',{name:'전장 생성',exact:false}).click();
  await expect(page.getByText('친구를 기다리는 중')).toBeVisible();
@@ -15,7 +16,7 @@ test('browser can create a room and a second client can join',async ({page,brows
  peer.on('pageerror',error=>errors.push('peer: '+error.message));
  try{
   await peer.goto('/?room='+code);
-  await expect(peer.getByText('게임 서버 연결됨')).toBeVisible();
+  await expect(peer.locator('.menu-server.online')).toBeVisible();
   await expect(peer.getByRole('textbox',{name:'초대 코드'})).toHaveValue(code);
   await peer.getByRole('button',{name:'입장',exact:true}).click();
   await expect(peer.locator('.scoreboard')).toBeVisible();
@@ -47,10 +48,11 @@ test('browser can create a room and a second client can join',async ({page,brows
 
 test('low graphics mode keeps room creation playable',async ({page})=>{
  await page.goto('/');
- await expect(page.getByText('게임 서버 연결됨')).toBeVisible();
+ await expect(page.locator('.menu-server.online')).toBeVisible();
  const setting=page.getByLabel('그래픽 품질');
  await setting.selectOption('low');
  await expect(setting).toHaveValue('low');
+ await page.getByRole('button',{name:/친구 대전/}).click();
  await page.getByRole('button',{name:'전장 생성',exact:false}).click();
  await expect(page.getByText('친구를 기다리는 중')).toBeVisible();
  await expect(page.locator('canvas')).toBeVisible();
