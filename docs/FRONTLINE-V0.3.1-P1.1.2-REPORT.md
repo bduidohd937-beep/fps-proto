@@ -12,6 +12,8 @@ The failures in Actions runs `41278874999` and `41278883545` were isolated to th
 
 The game input path itself was not bypassed or disabled. The test now performs a real coordinate mouse click on the canvas and asserts Pointer Lock before measuring yaw. The original comparison also incorrectly compared raw yaw deltas from two potentially different browser `movementX` values and reused absolute coordinates after a lock transition. The corrected test records cumulative `movementX`, releases and reacquires Pointer Lock between samples, verifies the ADS state, and compares yaw-per-input-unit. Failure diagnostics preserve lock state, aim state, event count, and cumulative movement.
 
+The next CI run also exposed that the visible yaw stream can include legitimate server shot recoil while the bot is active. The test now compares the mouse-applied yaw contribution separately, while still requiring visible yaw movement and preserving both values in diagnostics. This prevents recoil from being misreported as a sensitivity failure.
+
 During the required ESC regression check, a second real defect was found: the global game Escape handler called `preventDefault()`, interfering with browser Pointer Lock release. The handler now explicitly exits Pointer Lock before opening or closing the settings overlay.
 
 ## Changes
