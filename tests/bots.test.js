@@ -80,3 +80,19 @@ test('bot movement advances using 3D collision simulation',()=>{
 test('AI difficulty profiles expose distinct reaction intervals',()=>{
  assert.ok(BOT_DIFFICULTY.rookie.reactionMs>BOT_DIFFICULTY.regular.reactionMs);
 });
+
+test('autonomous regular bot eventually reaches a stationary human and fires',()=>{
+ const a=bot(),b=human();
+ const room={status:'playing',mode:'solo',difficulty:'regular',winnerId:null,players:[b,a]};
+ let shots=0,damage=0;
+ const initial=Math.hypot(a.x-b.x,a.z-b.z);
+ let minDistance=initial;
+ for(let i=0;i<30*110&&shots===0;i++){
+  const now=1000+i*(1000/30);
+  updateBot(room,a,b,now,1/30,result=>{shots++;damage+=result.damage;},()=>.5);
+  minDistance=Math.min(minDistance,Math.hypot(a.x-b.x,a.z-b.z));
+ }
+ assert.ok(minDistance<initial-10,'bot must navigate far enough to find the player');
+ assert.ok(shots>0,'bot must fire after finding line of sight, not just patrol forever');
+ assert.ok(damage>0,'bot shots should use real authoritative hit detection');
+});
