@@ -18,7 +18,7 @@ test('mouse rotation applies general sensitivity to yaw and pitch without recoil
  assert.equal(result.yawDelta,-.44);
  assert.equal(result.pitchDelta,.22);
  assert.equal(result.yaw,.56);
- assert.equal(result.pitch,.42);
+ assert.ok(Math.abs(result.pitch-.42)<1e-12);
 });
 test('mouse rotation applies ADS multiplier independently of final yaw',()=>{
  const result=applyMouseRotation({yaw:-.4,pitch:0,movementX:100,movementY:0,settings:{general:2,ads:.5},ads:true});
