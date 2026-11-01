@@ -48,12 +48,14 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
    throw error;
   }
  };
- await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+ await page.mouse.move(centerX,centerY,{steps:1});
+ await page.mouse.click(centerX,centerY);
  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+ await page.waitForTimeout(100);
  await expect(canvas).toHaveAttribute('data-acceptance-pointer-lock','locked');
  await expect(canvas).toHaveAttribute('data-acceptance-aim','general');
  const before=Number(await canvas.getAttribute('data-acceptance-yaw'));
- await page.mouse.move(centerX+120,centerY,{steps:1});
+ await page.mouse.move(centerX+120,centerY,{steps:10});
  await expectYawChange(before,'general');
  const generalInput=Math.abs((await readInput()).movementX);
  const generalState=await readInput();
@@ -71,7 +73,7 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
  await expect(canvas).toHaveAttribute('data-acceptance-aim','ads');
  const adsBefore=Number(await canvas.getAttribute('data-acceptance-yaw'));
  const adsInputBefore=(await readInput()).movementX;
- await page.mouse.move(centerX+220,centerY,{steps:1});
+ await page.mouse.move(centerX+220,centerY,{steps:10});
  await expectYawChange(adsBefore,'ads');
  const adsInput=Math.abs((await readInput()).movementX-adsInputBefore);
  const adsState=await readInput();
