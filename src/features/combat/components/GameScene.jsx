@@ -1,12 +1,13 @@
 import {useEffect,useMemo,useRef} from 'react';
 import {Canvas,useFrame,useThree} from '@react-three/fiber';
 import {Vector3,Group,Mesh,BoxGeometry,MeshStandardMaterial} from 'three';
-import {PLAYER_EYE,CROUCH_EYE,movePlayer3D} from '../../../../shared/rules.js';
+import {PLAYER_EYE,CROUCH_EYE,PRONE_EYE,movePlayer3D} from '../../../../shared/rules.js';
 import {smoothingFactor,shortestAngleDelta} from '../utils/renderSmoothing.js';
 import {FrontlineArena} from '../../arena/index.js';
 import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
 import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
 import {OPERATORS,DEFAULT_OPERATOR_ID} from '../../../../shared/operators.js';
+import {getVisualKick} from '../../../../shared/recoil.js';
 
 
 
@@ -32,6 +33,27 @@ function Soldier({player}){
  if(!player||player.hp<=0)return null;
  const crouchScale=player.crouch?0.67:1;
  const uniform=OPERATORS[player.operatorId]?.color||OPERATORS[DEFAULT_OPERATOR_ID].color;
+ if(player.prone)return <group ref={visual} position={origin.position} rotation={origin.rotation}>
+  <mesh castShadow position={[0,.29,0]} rotation={[-Math.PI/2,0,0]}>
+   <capsuleGeometry args={[.28,.66,6,10]}/>
+   <meshStandardMaterial color={uniform} metalness={.18} roughness={.86}/>
+  </mesh>
+  <mesh castShadow position={[0,.34,-.61]}>
+   <sphereGeometry args={[.21,12,12]}/>
+   <meshStandardMaterial color="#3a4744" metalness={.28} roughness={.78}/>
+  </mesh>
+  {[-.22,.22].map(x=><mesh key={x} castShadow position={[x,.20,.61]}>
+   <boxGeometry args={[.23,.25,.63]}/>
+   <meshStandardMaterial color="#252e2c" roughness={.82}/>
+  </mesh>)}
+  <mesh position={[.15,.32,-.52]}>
+   <boxGeometry args={[.16,.14,.83]}/>
+   <meshStandardMaterial color="#1a272b" metalness={.65} roughness={.46}/>
+  </mesh>
+  <mesh position={[0,.86,0]}>
+   <boxGeometry args={[.85,.065,.1]}/><meshBasicMaterial color={player.hp>30?'#66dfaa':'#e96b66'}/>
+  </mesh>
+ </group>;
  return <group ref={visual} position={origin.position} rotation={origin.rotation}>
   <group scale={[1,crouchScale,1]}>
    <mesh position={[0,1.03,0]} castShadow>
@@ -123,11 +145,11 @@ function PlayerController({player,status,socket}){
  const keys=useRef(new Set());
  const local=useRef({
   x:player.x,y:player.y??0,z:player.z,vy:player.vy??0,
-  grounded:player.grounded!==false,crouch:!!player.crouch,jumpHeld:false
+  grounded:player.grounded!==false,crouch:!!player.crouch,prone:!!player.prone,jumpHeld:false
  });
  const yaw=useRef(player.yaw),pitch=useRef(player.pitch);
  const sendTimer=useRef(0),fireTimer=useRef(0),bob=useRef(0),recoil=useRef(0);
- const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false);
+ const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false),proneToggle=useRef(false);
  const visibleWeapon=useRef(player.weaponId||DEFAULT_WEAPON_ID);
  running.current=status==='playing'&&player.hp>0;
  useEffect(()=>{
@@ -142,8 +164,9 @@ function PlayerController({player,status,socket}){
   };
   const keyDown=e=>{
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
-   if(e.repeat&&(/^(Digit[1-4]|KeyR)$/.test(e.code)))return;
+   if(e.repeat&&(/^(Digit[1-4]|KeyR|KeyZ)$/.test(e.code)))return;
    keys.current.add(e.code);
+   if(e.code==='KeyZ'&&running.current)proneToggle.current=!proneToggle.current;
    if(!running.current)return;
    if(e.code==='KeyR')socket.emit('player:reload');
    const match=e.code.match(/^Digit([1-4])$/);
@@ -171,13 +194,16 @@ function PlayerController({player,status,socket}){
    if(event.shooterId!==socket.id)return;
    const current=WEAPONS[event.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
    recoil.current=1;
-   pitch.current=Math.min(1.42,pitch.current+current.recoil*.33);
+   const kick=getVisualKick(current,event.recoilIndex??0,event.stance??'standing');
+   pitch.current=Math.min(1.42,pitch.current+kick.pitch);
+   yaw.current-=kick.yaw;
   };
   const onRespawn=data=>{
    yaw.current=data.yaw;pitch.current=0;recoil.current=0;
+   proneToggle.current=false;
    keys.current.clear();aimHeld.current=false;firing.current=false;
    if(Number.isFinite(data.x)&&Number.isFinite(data.y)&&Number.isFinite(data.z))
-    local.current={x:data.x,y:data.y,z:data.z,vy:0,grounded:true,crouch:false,jumpHeld:false};
+    local.current={x:data.x,y:data.y,z:data.z,vy:0,grounded:true,crouch:false,prone:false,jumpHeld:false};
   };
   dom.addEventListener('click',lock);
   document.addEventListener('mousemove',move);
@@ -221,7 +247,8 @@ function PlayerController({player,status,socket}){
    sprint:(keysNow.has('ShiftLeft')||keysNow.has('ShiftRight'))&&!ads,
    ads,
    jump:keysNow.has('Space'),
-   crouch:keysNow.has('ControlLeft')||keysNow.has('ControlRight')||keysNow.has('KeyC'),
+   crouch:!proneToggle.current&&(keysNow.has('ControlLeft')||keysNow.has('ControlRight')||keysNow.has('KeyC')),
+   prone:proneToggle.current,
    yaw:yaw.current,pitch:pitch.current
   };
   if(running.current)local.current=movePlayer3D(local.current,input,dt);
@@ -230,15 +257,15 @@ function PlayerController({player,status,socket}){
   if(dx*dx+dy*dy+dz*dz>16){
    // Large remote correction, e.g. respawn, must not move the camera through world geometry.
    predicted.x=player.x;predicted.y=player.y??0;predicted.z=player.z;predicted.vy=player.vy??0;
-   predicted.grounded=player.grounded!==false;predicted.crouch=!!player.crouch;
+   predicted.grounded=player.grounded!==false;predicted.crouch=!!player.crouch;predicted.prone=!!player.prone;
   }else{
    const blend=smoothingFactor(dt,8);
    predicted.x+=dx*blend;predicted.y+=dy*blend;predicted.z+=dz*blend;
   }
   const walking=running.current&&(input.forward!==0||input.strafe!==0)&&predicted.grounded;
-  if(walking)bob.current+=dt*(input.sprint?16:10);
-  const motion=walking?Math.sin(bob.current)*(input.sprint?.055:.028):0;
-  const eye=predicted.crouch?CROUCH_EYE:PLAYER_EYE;
+  if(walking)bob.current+=dt*(predicted.prone?4:input.sprint?16:input.crouch?7:10);
+  const motion=walking?Math.sin(bob.current)*(predicted.prone?.006:input.sprint?.055:input.crouch?.014:.028):0;
+  const eye=predicted.prone?PRONE_EYE:predicted.crouch?CROUCH_EYE:PLAYER_EYE;
   camera.position.lerp(target.set(predicted.x,predicted.y+eye+motion,predicted.z),smoothingFactor(dt,24));
   camera.rotation.set(pitch.current,yaw.current,0,'YXZ');
   recoil.current=Math.max(0,recoil.current-dt*7);
@@ -249,7 +276,7 @@ function PlayerController({player,status,socket}){
   if(gun.current){
    gun.current.position.set(
     .35+motion*.24+(-.305-motion*.24)*zoom,
-    -.37+motion*.16+(.13-motion*.16)*zoom,
+    -.37+motion*.16+(.13-motion*.16)*zoom+(predicted.prone?.09:0),
     -.53+recoil.current*.14+(input.sprint?.07:0)+.12*zoom
    );
    gun.current.rotation.x=-recoil.current*playerWeapon.recoil+(input.sprint?-.08:0);

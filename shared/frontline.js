@@ -4,11 +4,14 @@ export const ARENA_HALF=22;
 export const PLAYER_RADIUS=.44;
 export const PLAYER_HEIGHT=1.8;
 export const CROUCH_HEIGHT=1.12;
+export const PRONE_HEIGHT=.56;
 export const PLAYER_EYE=1.55;
 export const CROUCH_EYE=.96;
+export const PRONE_EYE=.42;
 export const WALK_SPEED=5.2;
 export const RUN_SPEED=7.2;
 export const CROUCH_SPEED=2.7;
+export const PRONE_SPEED=1.3;
 export const GRAVITY=22;
 export const JUMP_HEIGHT=1.30;
 export const JUMP_SPEED=Math.sqrt(2*GRAVITY*JUMP_HEIGHT);
@@ -49,7 +52,9 @@ export const WORLD_BOXES=[
  box('barrier',-4,10,3.2,1,.93),
  box('barrier',4,-10,3.2,1,.93),
  // Low overhead duct forces crouching to pass under it.
- box('beam',0,-8,4,1.15,.38,1.43)
+ box('beam',0,-8,4,1.15,.38,1.43),
+ // A low pipe crossing that requires actual prone collision (0.56m tall).
+ box('prone-beam',8,-5,3,1.1,.34,.82)
 ];
 export const COVER=WORLD_BOXES.filter(b=>!['wall','step','catwalk'].includes(b.kind));
 export const SPAWNS=[
@@ -68,7 +73,7 @@ function heightOverlaps(y,height,b){
 function collisionBox(x,y,z,height){
  return WORLD_BOXES.find(b=>overlapsFootprint(x,z,b)&&heightOverlaps(y,height,b));
 }
-function canFit(x,y,z,height){
+export function canFit(x,y,z,height){
  return !collisionBox(x,y,z,height);
 }
 function supportHeight(x,z,ceiling=Infinity){
@@ -92,14 +97,16 @@ export function movePlayer3D(position,input={},delta=1/30){
  let z=Number.isFinite(position.z)?position.z:0;
  let vy=Number.isFinite(position.vy)?position.vy:0;
  let grounded=position.grounded!==false;
- const wantsCrouch=input.crouch===true;
- const crouch=wantsCrouch||!canFit(x,y,z,PLAYER_HEIGHT);
- const height=crouch?CROUCH_HEIGHT:PLAYER_HEIGHT;
+ const wantsProne=input.prone===true;
+ // Do not stand through low ceilings; automatically remain prone/crouched until clear.
+ const prone=wantsProne||!canFit(x,y,z,CROUCH_HEIGHT);
+ const crouch=!prone&&(input.crouch===true||!canFit(x,y,z,PLAYER_HEIGHT));
+ const height=prone?PRONE_HEIGHT:crouch?CROUCH_HEIGHT:PLAYER_HEIGHT;
  const yaw=Number.isFinite(input.yaw)?input.yaw:0;
  const forward=clamp(Number(input.forward)||0,-1,1);
  const strafe=clamp(Number(input.strafe)||0,-1,1);
  const diagonal=1/Math.max(1,Math.hypot(forward,strafe));
- const speed=crouch?CROUCH_SPEED:input.sprint===true?RUN_SPEED:WALK_SPEED;
+ const speed=prone?PRONE_SPEED:crouch?CROUCH_SPEED:input.sprint===true?RUN_SPEED:WALK_SPEED;
  const dx=(-Math.sin(yaw)*forward+Math.cos(yaw)*strafe)*speed*dt*diagonal;
  const dz=(-Math.cos(yaw)*forward-Math.sin(yaw)*strafe)*speed*dt*diagonal;
  const bound=ARENA_HALF-PLAYER_RADIUS-.33;
@@ -117,7 +124,7 @@ export function movePlayer3D(position,input={},delta=1/30){
  advance('z',dz);
  const jumpHeld=input.jump===true;
  const pressed=jumpHeld && position.jumpHeld!==true;
- if(grounded && pressed){
+ if(grounded && pressed && !prone){
   vy=JUMP_SPEED;
   grounded=false;
  }
@@ -148,7 +155,7 @@ export function movePlayer3D(position,input={},delta=1/30){
   y=Math.max(0,nextY);
   if(y===0&&vy<0){vy=0;grounded=true;}
  }
- return {x,y,z,vy,grounded,crouch,jumpHeld};
+ return {x,y,z,vy,grounded,crouch,prone,jumpHeld};
 }
 // Backwards-compatible horizontal helper for legacy test consumers.
 export function movePlayer(pos,input,dt){
@@ -179,10 +186,10 @@ export function rayBox(origin,dir,b){
  return far<0?Infinity:Math.max(near,0);
 }
 export function shotHitsPlayer(shooter,target){
- const origin={x:shooter.x,y:(shooter.y||0)+(shooter.crouch?CROUCH_EYE:PLAYER_EYE),z:shooter.z};
+ const origin={x:shooter.x,y:(shooter.y||0)+(shooter.prone?PRONE_EYE:shooter.crouch?CROUCH_EYE:PLAYER_EYE),z:shooter.z};
  const dir=aimDirection(shooter.yaw,shooter.pitch);
- const center={x:target.x,y:(target.y||0)+(target.crouch?.62:1),z:target.z};
- const radius=target.crouch?.57:.82;
+ const center={x:target.x,y:(target.y||0)+(target.prone?.30:target.crouch?.62:1),z:target.z};
+ const radius=target.prone?.27:target.crouch?.57:.82;
  const distance=raySphere(origin,dir,center,radius);
  return distance<=MAX_SHOT_DISTANCE && WORLD_BOXES.every(b=>rayBox(origin,dir,b)>=distance-.001);
 }

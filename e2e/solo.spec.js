@@ -43,3 +43,24 @@ test('operator preview selector updates with four different characters',async ({
  await page.reload();
  await expect(page.locator('.menu-personnel-card')).toContainText('HAWKEYE');
 });
+
+test('Z prone toggles authoritative position while F3 controls debug HUD visibility',async ({page})=>{
+ const errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/');
+ await expect(page.locator('.menu-server.online')).toBeVisible();
+ await page.getByRole('button',{name:/AI 대전 시작/}).click();
+ await expect(page.locator('.scoreboard')).toBeVisible({timeout:10000});
+ const stance=page.getByTestId('stance');
+ const debug=page.locator('.movement-status');
+ await expect(debug).toHaveClass(/debug-hidden/);
+ await page.keyboard.press('F3');
+ await expect(debug).toBeVisible();
+ await page.keyboard.press('z');
+ await expect(stance).toHaveText('엎드림',{timeout:4000});
+ await page.keyboard.press('z');
+ await expect(stance).not.toHaveText('엎드림',{timeout:4000});
+ await page.keyboard.press('F3');
+ await expect(debug).toHaveClass(/debug-hidden/);
+ expect(errors).toEqual([]);
+});

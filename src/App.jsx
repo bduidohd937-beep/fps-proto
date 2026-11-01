@@ -25,6 +25,7 @@ export default function App(){
  const [roomPending,setRoomPending]=useState('');
  const [hitmarker,setHitmarker]=useState(false);
  const [headshot,setHeadshot]=useState(false);
+ const [showDebug,setShowDebug]=useState(false);
  const [damageFlash,setDamageFlash]=useState(false);
  const lastHp=useRef(null);
  useEffect(()=>{
@@ -75,6 +76,11 @@ export default function App(){
    }
   });
   return ()=>{socket.disconnect();socketRef.current=null;};
+ },[]);
+ useEffect(()=>{
+  const onDebug=e=>{if(e.code==='F3'){e.preventDefault();setShowDebug(x=>!x);}};
+  window.addEventListener('keydown',onDebug);
+  return ()=>window.removeEventListener('keydown',onDebug);
  },[]);
  const me=match?.players.find(p=>p.id===myId);
  const enemy=match?.players.find(p=>p.id!==myId);
@@ -187,10 +193,10 @@ export default function App(){
    {match.status==='playing'&&alive&&<div className={'crosshair '+(hitmarker?'hit ':'')+(me.ads?'ads':'')}>
     <span/><span/><span/><span/><i/>
    </div>}
-   {match.status==='playing'&&alive&&<div className="aim-hint">좌클릭 사격 · 우클릭 정조준 · 1~4 무기 · SPACE 점프 · R 장전</div>}
+   
    {headshot&&alive&&<div className="headshot-confirmation" role="status">HEADSHOT +</div>}
-   {match.status==='playing'&&me&&<div className="movement-status" aria-label="이동 상태">
-    <span data-testid="stance">{me.crouch?"앉기":me.grounded?"지상":"공중"}</span>
+   {match.status==='playing'&&me&&<div className={'movement-status '+(showDebug?'':'debug-hidden')} aria-label="이동 상태">
+    <span data-testid="stance">{me.prone?"엎드림":me.crouch?"앉기":me.grounded?"지상":"공중"}</span>
     <span data-testid="altitude" data-y={Number(me.y??0).toFixed(2)}>고도 {Number(me.y??0).toFixed(1)}m</span>
    </div>}
    <div className="loadout-bar" aria-label="무기 선택">

@@ -1,15 +1,19 @@
-import {WORLD_BOXES,PLAYER_RADIUS} from '../../shared/rules.js';
+import {WORLD_BOXES,PLAYER_RADIUS,PLAYER_HEIGHT,canFit} from '../../shared/rules.js';
 
 // Ground-level 8-connected path graph (21x21, ~2m cells). Reuse graph in every bot.
 const SPACING=2,MIN=-20,MAX=20,SIZE=Math.round((MAX-MIN)/SPACING)+1;
-const OBSTACLES=WORLD_BOXES.filter(b=>b.kind!=='step'&&b.kind!=='catwalk'&&b.y<1.72&&b.y+b.h>.14);
+// Ground nav uses the same standing capsule volume as the game simulation.
 function blocked(x,z){
  if(Math.abs(x)>20||Math.abs(z)>20)return true;
- return OBSTACLES.some(b=>{
-  const nx=Math.max(b.x-b.w/2,Math.min(x,b.x+b.w/2));
-  const nz=Math.max(b.z-b.d/2,Math.min(z,b.z+b.d/2));
-  return Math.hypot(x-nx,z-nz)<PLAYER_RADIUS+.27;
- });
+ return !canFit(x,0,z,PLAYER_HEIGHT);
+}
+function clearEdge(a,b){
+ const steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.35));
+ for(let step=1;step<=steps;step++){
+  const alpha=step/steps;
+  if(blocked(a.x+(b.x-a.x)*alpha,a.z+(b.z-a.z)*alpha))return false;
+ }
+ return true;
 }
 const nodes=Array.from({length:SIZE*SIZE},(_,i)=>{
  const col=i%SIZE,row=Math.floor(i/SIZE),x=MIN+col*SPACING,z=MIN+row*SPACING;
@@ -24,6 +28,7 @@ const adjacency=nodes.map(node=>{
   const target=nodes[row*SIZE+col];
   if(!target.open)return [];
   if(dx&&dz&&(!nodes[node.row*SIZE+col].open||!nodes[row*SIZE+node.col].open))return [];
+  if(!clearEdge(node,target))return [];
   return [{id:target.id,cost:Math.hypot(dx,dz)}];
  });
 });

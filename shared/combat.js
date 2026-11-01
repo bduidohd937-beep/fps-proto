@@ -1,11 +1,12 @@
-import {WORLD_BOXES,PLAYER_EYE,CROUCH_EYE,aimDirection,raySphere,rayBox,clamp} from './rules.js';
+import {WORLD_BOXES,PLAYER_EYE,CROUCH_EYE,PRONE_EYE,aimDirection,raySphere,rayBox,clamp} from './rules.js';
 import {WEAPONS,DEFAULT_WEAPON_ID} from './weapons.js';
+import {getStance,STANCE_AIM} from './recoil.js';
 
 // Client-supplied target IDs, damage values and hit-zone claims are never accepted.
 export function traceShot(shooter,target,weapon=WEAPONS[DEFAULT_WEAPON_ID],yawOffset=0,pitchOffset=0){
  if(!target || target.hp<=0)return null;
  const origin={
-  x:shooter.x,y:(shooter.y??0)+(shooter.crouch?CROUCH_EYE:PLAYER_EYE),z:shooter.z
+  x:shooter.x,y:(shooter.y??0)+(shooter.prone?PRONE_EYE:shooter.crouch?CROUCH_EYE:PLAYER_EYE),z:shooter.z
  };
  const yaw=shooter.yaw+yawOffset;
  const pitch=clamp(shooter.pitch+pitchOffset,-Math.PI/2+.05,Math.PI/2-.05);
@@ -13,17 +14,17 @@ export function traceShot(shooter,target,weapon=WEAPONS[DEFAULT_WEAPON_ID],yawOf
  const base=target.y??0;
  const head={
   x:target.x,
-  y:base+(target.crouch?.91:1.62),
+  y:base+(target.prone?.40:target.crouch?.91:1.62),
   z:target.z
  };
- const headDistance=raySphere(origin,direction,head,target.crouch?.205:.25);
+ const headDistance=raySphere(origin,direction,head,target.prone?.16:target.crouch?.205:.25);
  const bodyBox={
-  x:target.x,z:target.z,w:.72,d:.66,
-  y:base+(target.crouch?.1:.28),h:target.crouch?.65:1.11
+  x:target.x,z:target.z,w:.72,d:target.prone?1.0:.66,
+  y:base+(target.prone?.08:target.crouch?.1:.28),h:target.prone?.32:target.crouch?.65:1.11
  };
  const legBox={
-  x:target.x,z:target.z,w:.54,d:.56,
-  y:base+.015,h:target.crouch?.20:.47
+  x:target.x,z:target.z,w:.54,d:target.prone?.88:.56,
+  y:base+.015,h:target.prone?.16:target.crouch?.20:.47
  };
  const hits=[
   {zone:'head',distance:headDistance},
@@ -46,9 +47,7 @@ export function computeDamage(weapon,zone,distance){
 }
 export function getShotSpread(weapon,shooter){
  const initial=shooter.ads?weapon.spreadAds:weapon.spreadHip;
- const movement=(shooter.input?.sprint&&!shooter.ads)?1.45:1;
- const airborne=shooter.grounded===false?1.55:1;
- const crouch=shooter.crouch?.82:1;
+ const factor=STANCE_AIM[getStance(shooter)].spread;
  const bloom=1+clamp(shooter.bloom??0,0,2);
- return initial*movement*airborne*crouch*bloom;
+ return initial*factor*bloom;
 }
