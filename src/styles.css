@@ -236,3 +236,6 @@
 @media(prefers-reduced-motion:reduce){
  .menu-tabs button,.menu-deploy,.weapon-slot{transition:none}
 }
+
+/* P1: combat debug telemetry is opt-in; press F3 to display. */
+.movement-status.debug-hidden{display:none}

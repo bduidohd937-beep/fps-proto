@@ -112,7 +112,7 @@ export function MainMenu({connected,pending,message,typedCode,onCodeChange,onJoi
    </aside>
   </div>
   <footer className="menu-footer">
-   <span>WASD 이동 · SHIFT 질주 · SPACE 점프 · 우클릭 ADS · 숫자키 1~4 무기</span>
+   <span>WASD 이동 · SHIFT 질주 · CTRL 앉기 · Z 엎드리기 · SPACE 점프 · 우클릭 ADS · 숫자키 1~4 무기</span>
    <span>ONLINE TACTICAL ARENA</span>
   </footer>
  </section>;
