@@ -1,6 +1,9 @@
 import {useEffect,useRef,useState} from 'react';
 import {io} from 'socket.io-client';
-import GameScene from './components/GameScene.jsx';
+import {GameScene} from './features/combat/index.js';
+import {GraphicsQualitySelect} from './features/lobby/index.js';
+import {useBattleClock} from './features/match/index.js';
+import {GAME_PROTOCOL,GAME_VERSION} from '../shared/version.js';
 import {MAX_HP} from '../shared/rules.js';
 import {WEAPON_IDS,WEAPONS,DEFAULT_WEAPON_ID} from '../shared/weapons.js';
 
@@ -17,7 +20,6 @@ export default function App(){
  const [hitmarker,setHitmarker]=useState(false);
  const [headshot,setHeadshot]=useState(false);
  const [damageFlash,setDamageFlash]=useState(false);
- const [now,setNow]=useState(Date.now());
  const lastHp=useRef(null);
  useEffect(()=>{
   const socket=io({reconnectionAttempts:10});socketRef.current=socket;
@@ -29,8 +31,8 @@ export default function App(){
    try{
     const response=await fetch('/api/health',{cache:'no-store',signal:controller.signal});
     const info=await response.json();
-    if(!response.ok||info.service!=='project-duel'||info.protocol!==4){
-     setMessage('연결된 서버가 PROJECT DUEL FRONTLINE V0.2.3 서버가 아닙니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
+    if(!response.ok||info.service!=='project-duel'||info.protocol!==GAME_PROTOCOL||info.version!==GAME_VERSION){
+     setMessage('연결된 서버가 현재 게임 버전과 일치하지 않습니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
      return;
     }
     if(!socket.connected)return;
@@ -67,6 +69,7 @@ export default function App(){
  },[]);
  const me=match?.players.find(p=>p.id===myId);
  const enemy=match?.players.find(p=>p.id!==myId);
+ const now=useBattleClock({active:Boolean(roomCode&&match),reloadAt:me?.reloadAt,respawnAt:me?.respawnAt});
  useEffect(()=>{
   if(!me)return;
   if(lastHp.current!==null&&me.hp<lastHp.current){
@@ -77,10 +80,6 @@ export default function App(){
   }
   lastHp.current=me.hp;
  },[me?.hp,me?.id]);
- useEffect(()=>{
-  const timer=window.setInterval(()=>setNow(Date.now()),100);
-  return ()=>window.clearInterval(timer);
- },[]);
  const requestRoom=(action,code)=>{
   const socket=socketRef.current;
   if(!socket?.connected||!connected)return setMessage('PROJECT DUEL 서버 연결이 확인되지 않았습니다. 개발 서버를 재시작해 주세요.');
@@ -167,14 +166,7 @@ export default function App(){
      </div>
     </form>
    </div>
-   <div className="graphics-option">
-    <label htmlFor="graphics-quality">그래픽 품질</label>
-    <select id="graphics-quality" value={graphicsQuality} onChange={e=>setGraphicsQuality(e.target.value)}>
-     <option value="low">성능 우선</option>
-     <option value="balanced">균형 (추천)</option>
-     <option value="high">고화질</option>
-    </select>
-   </div>
+   <GraphicsQualitySelect value={graphicsQuality} onChange={setGraphicsQuality}/>
    <div className="instructions">
     <span><kbd>W A S D</kbd> 이동</span>
     <span><kbd>SHIFT</kbd> 전력질주</span>

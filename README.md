@@ -150,3 +150,22 @@ npm run dev
 게임: http://localhost:5173 / 서버 확인: http://localhost:43171/api/health
 
 두 브라우저에서 같은 방 코드로 입장한 다음 키 1~4로 무기를 바꾸고 우클릭 정조준·발사·재장전·헤드샷을 확인한다. 기존 Render 공개 서비스는 이 기능 브랜치를 배포하지 않았으므로 변경되지 않는다.
+
+---
+
+## V0.3.0 P0 — isolated, non-gameplay foundation
+
+Branch: `chore/frontline-v0.3.0-p0-foundation` (not merged, not deployed).
+Builds on V0.2.3, preserving protocol 4, game rules, all 4 weapons and existing 1v1 play.
+
+- Feature source directories `src/features/{arena,combat,lobby,match,modes,operators}` with public API entrypoints.
+- Server pure player module `server/domain/players.js`; future bot runtime has a reserved directory.
+- Shared `shared/version.js`, global read-only graphics presets and a safe asset catalog.
+- Asset categories `public/assets/{operators,weapons,maps,audio,ui}`; no third-party binary assets added.
+- Lobby's perpetual 100ms render timer replaced by a clock only active during actual countdowns.
+- CI guard `npm run check:architecture` catches broken imports, forbidden cross-feature dependencies, duplicated or unsafe asset paths.
+- Local version doctor: `npm run doctor` compares expected Git/health/version and detects stale Vite App code on localhost:5173.
+- Architectural details: `docs/FRONTLINE-V0.3-P0-ARCHITECTURE.md`.
+- Baseline vs local old V0.1.3 screenshot: `docs/FRONTLINE-V0.3-P0-AUDIT.md`.
+
+No V0.3.0 main UI, bots, operator perks or new assets are implemented as part of P0.

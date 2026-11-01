@@ -1,5 +1,6 @@
 import {memo} from 'react';
-import {ARENA_HALF,WORLD_BOXES} from '../../shared/rules.js';
+import {ARENA_HALF,WORLD_BOXES} from '../../../../shared/rules.js';
+import {resolveQuality} from '../../../config/renderQuality.js';
 
 // IRON DEPOT: self-contained industrial 3D arena. Render objects share collision dimensions.
 const MATERIALS={
@@ -82,14 +83,15 @@ function Floodlight({x,z,angle=0,quality}){
  </group>;
 }
 export const FrontlineArena=memo(function FrontlineArena({quality}){
- const shadow=quality!=='low';
+ const preset=resolveQuality(quality);
+ const shadow=preset.shadows;
  return <>
   <color attach="background" args={['#8b9aa4']}/>
   <fog attach="fog" args={['#8b9aa4',32,105]}/>
   <ambientLight intensity={.68}/>
   <hemisphereLight intensity={1.2} color="#e6f0fb" groundColor="#4e544d"/>
   <directionalLight position={[-19,29,13]} intensity={2.5} castShadow={shadow}
-   shadow-mapSize={quality==='high'?[2048,2048]:[1024,1024]}
+   shadow-mapSize={preset.shadowMapSize}
    shadow-camera-left={-27} shadow-camera-right={27}
    shadow-camera-top={27} shadow-camera-bottom={-27}
    shadow-bias={-.0002}/>
