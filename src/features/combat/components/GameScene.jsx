@@ -8,7 +8,7 @@ import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
 import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
 import {OPERATORS,DEFAULT_OPERATOR_ID} from '../../../../shared/operators.js';
 import {getVisualKick} from '../../../../shared/recoil.js';
-import {sensitivityForAim} from '../../settings/index.js';
+import {applyMouseRotation,sensitivityForAim} from '../../settings/index.js';
 import {reconcilePrediction} from '../../../../shared/reconciliation.js';
 
 
@@ -173,12 +173,15 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
    dom.dataset.acceptanceMouseTotalY=String(mouseInput.current.y);
    dom.dataset.acceptanceLastMovementX=String(e.movementX??0);
    dom.dataset.acceptanceLastMovementY=String(e.movementY??0);
-   const multiplier=sensitivityForAim(sensitivityRef.current,aimHeld.current);
-   dom.dataset.acceptanceLastSensitivity=String(multiplier);
-   mouseYaw.current-=e.movementX*.0022*multiplier;
+   const rotation=applyMouseRotation({
+    yaw:yaw.current,pitch:pitch.current,movementX:e.movementX??0,movementY:e.movementY??0,
+    settings:sensitivityRef.current,ads:aimHeld.current
+   });
+   dom.dataset.acceptanceLastSensitivity=String(rotation.sensitivity);
+   mouseYaw.current+=rotation.yawDelta;
    dom.dataset.acceptanceMouseYaw=String(mouseYaw.current);
-   yaw.current-=e.movementX*.0022*multiplier;
-   pitch.current=Math.max(-1.42,Math.min(1.42,pitch.current-e.movementY*.0022*multiplier));
+   yaw.current=rotation.yaw;
+   pitch.current=rotation.pitch;
   };
   const keyDown=e=>{
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
