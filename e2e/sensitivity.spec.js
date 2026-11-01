@@ -29,10 +29,16 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
  await expect(page.locator('.scoreboard')).toBeVisible();
  const canvas=page.locator('canvas').first();
  await expect(canvas).toHaveAttribute('data-input-ready','true');
- await canvas.click();
+ await page.bringToFront();
+ const box=await canvas.boundingBox();
+ if(!box)throw new Error('game canvas has no bounds');
+ await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+ await expect(canvas).toHaveAttribute('data-acceptance-pointer-lock','locked');
  const before=Number(await canvas.getAttribute('data-acceptance-yaw'));
  await page.mouse.move(120,120,{steps:1});
  await expect.poll(async()=>Number(await canvas.getAttribute('data-acceptance-yaw'))).not.toBe(before);
+ expect(Number(await canvas.getAttribute('data-acceptance-mouse-events'))).toBeGreaterThan(0);
  const generalDelta=Math.abs(Number(await canvas.getAttribute('data-acceptance-yaw'))-before);
  await page.mouse.down({button:'right'});
  const adsBefore=Number(await canvas.getAttribute('data-acceptance-yaw'));
@@ -42,3 +48,25 @@ test('mouse movement exposes different applied yaw for general and ADS sensitivi
  await page.mouse.up({button:'right'});
  expect(adsDelta).toBeLessThan(generalDelta);
 });
+
+test('ESC releases pointer lock for settings and a real canvas click reacquires it',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('project-duel-sensitivity',JSON.stringify({general:1,ads:.8})));
+ await page.goto('/');
+ await expect(page.locator('.menu-server.online')).toBeVisible();
+ await page.getByRole('button',{name:/AI 대전 시작/}).click();
+ await expect(page.locator('.scoreboard')).toBeVisible();
+ const canvas=page.locator('canvas').first();
+ await expect(canvas).toHaveAttribute('data-input-ready','true');
+ await page.bringToFront();
+ const box=await canvas.boundingBox();
+ if(!box)throw new Error('game canvas has no bounds');
+ await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('heading',{name:'게임 설정'})).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===null)).toBe(true);
+ await page.getByRole('button',{name:'적용 후 닫기'}).click();
+ await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+ await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===document.querySelector('canvas'))).toBe(true);
+});
+
