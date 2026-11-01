@@ -188,7 +188,10 @@ export default function App(){
  const gameActive=roomCode&&me&&match;
  useEffect(()=>{
   const onEscape=e=>{
-   if(e.key==='Escape'&&gameActive){e.preventDefault();setSettingsOpen(open=>!open);}
+     if(e.key==='Escape'&&gameActive){
+      document.exitPointerLock?.();
+      setSettingsOpen(open=>!open);
+     }
   };
   document.addEventListener('keydown',onEscape);
   return ()=>document.removeEventListener('keydown',onEscape);
@@ -273,3 +276,4 @@ export default function App(){
   </section>}
  </main>;
 }
+

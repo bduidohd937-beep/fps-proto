@@ -8,7 +8,7 @@ import {CAMERA_CONFIG,resolveQuality} from '../../../config/renderQuality.js';
 import {DEFAULT_WEAPON_ID,WEAPONS,WEAPON_IDS} from '../../../../shared/weapons.js';
 import {OPERATORS,DEFAULT_OPERATOR_ID} from '../../../../shared/operators.js';
 import {getVisualKick} from '../../../../shared/recoil.js';
-import {sensitivityForAim} from '../../settings/index.js';
+import {applyMouseRotation,sensitivityForAim} from '../../settings/index.js';
 import {reconcilePrediction} from '../../../../shared/reconciliation.js';
 
 
@@ -154,6 +154,8 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
  sensitivityRef.current=sensitivity;
  const sendTimer=useRef(0),fireTimer=useRef(0),bob=useRef(0),recoil=useRef(0),telemetry=useRef({x:player.x,y:player.y??0,z:player.z,serverX:player.x,serverY:player.y??0,serverZ:player.z,serverNow:serverNow??0,serverSpeed:0,time:performance.now()});
  const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false),proneToggle=useRef(false);
+ const mouseInput=useRef({events:0,x:0,y:0});
+ const mouseYaw=useRef(0);
  const visibleWeapon=useRef(player.weaponId||DEFAULT_WEAPON_ID);
  running.current=status==='playing'&&player.hp>0;
  useEffect(()=>{
@@ -163,9 +165,23 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   const lock=()=>{if(running.current&&document.pointerLockElement!==dom)dom.requestPointerLock?.();};
   const move=e=>{
    if(document.pointerLockElement!==dom||!running.current)return;
-   const multiplier=sensitivityForAim(sensitivityRef.current,aimHeld.current);
-   yaw.current-=e.movementX*.0022*multiplier;
-   pitch.current=Math.max(-1.42,Math.min(1.42,pitch.current-e.movementY*.0022*multiplier));
+   mouseInput.current.events+=1;
+   mouseInput.current.x+=e.movementX??0;
+   mouseInput.current.y+=e.movementY??0;
+   dom.dataset.acceptanceMouseEvents=String(mouseInput.current.events);
+   dom.dataset.acceptanceMouseTotalX=String(mouseInput.current.x);
+   dom.dataset.acceptanceMouseTotalY=String(mouseInput.current.y);
+   dom.dataset.acceptanceLastMovementX=String(e.movementX??0);
+   dom.dataset.acceptanceLastMovementY=String(e.movementY??0);
+   const rotation=applyMouseRotation({
+    yaw:yaw.current,pitch:pitch.current,movementX:e.movementX??0,movementY:e.movementY??0,
+    settings:sensitivityRef.current,ads:aimHeld.current
+   });
+   dom.dataset.acceptanceLastSensitivity=String(rotation.sensitivity);
+   mouseYaw.current+=rotation.yawDelta;
+   dom.dataset.acceptanceMouseYaw=String(mouseYaw.current);
+   yaw.current=rotation.yaw;
+   pitch.current=rotation.pitch;
   };
   const keyDown=e=>{
    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
@@ -186,18 +202,22 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   const keyUp=e=>keys.current.delete(e.code);
   const mouseDown=e=>{
    if(document.pointerLockElement!==dom||!running.current)return;
-   if(e.button===2){e.preventDefault();aimHeld.current=true;return;}
+   if(e.button===2){e.preventDefault();aimHeld.current=true;dom.dataset.acceptanceAim='ads';return;}
    if(e.button!==0)return;
    firing.current=true;fireTimer.current=0;
    socket.emit('player:fire');
   };
   const mouseUp=e=>{
    if(e.button===0)firing.current=false;
-   if(e.button===2)aimHeld.current=false;
+   if(e.button===2){aimHeld.current=false;dom.dataset.acceptanceAim='general';}
   };
   const contextMenu=e=>{if(document.pointerLockElement===dom)e.preventDefault();};
   const loseFocus=()=>{keys.current.clear();firing.current=false;aimHeld.current=false;};
-  const pointerChange=()=>{if(document.pointerLockElement!==dom)loseFocus();};
+  const pointerChange=()=>{
+   dom.dataset.acceptancePointerLock=document.pointerLockElement===dom?'locked':'unlocked';
+   if(document.pointerLockElement!==dom)loseFocus();
+  };
+  const pointerError=()=>{dom.dataset.acceptancePointerLock='error';};
   const onShot=event=>{
    if(event.shooterId!==socket.id)return;
    const current=WEAPONS[event.weaponId]||WEAPONS[DEFAULT_WEAPON_ID];
@@ -221,10 +241,17 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   document.addEventListener('mouseup',mouseUp);
   dom.addEventListener('contextmenu',contextMenu);
   document.addEventListener('pointerlockchange',pointerChange);
+  document.addEventListener('pointerlockerror',pointerError);
   window.addEventListener('blur',loseFocus);
   socket.on('match:shot',onShot);socket.on('player:respawn',onRespawn);
   dom.dataset.controllerReady='true';
   dom.dataset.inputReady='true';
+  dom.dataset.acceptancePointerLock=document.pointerLockElement===dom?'locked':'unlocked';
+  dom.dataset.acceptanceMouseEvents='0';
+  dom.dataset.acceptanceMouseTotalX='0';
+  dom.dataset.acceptanceMouseTotalY='0';
+  dom.dataset.acceptanceMouseYaw='0';
+  dom.dataset.acceptanceAim='general';
   return ()=>{
    delete dom.dataset.controllerReady;
    delete dom.dataset.inputReady;
@@ -236,6 +263,7 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
    document.removeEventListener('mouseup',mouseUp);
    dom.removeEventListener('contextmenu',contextMenu);
    document.removeEventListener('pointerlockchange',pointerChange);
+   document.removeEventListener('pointerlockerror',pointerError);
    window.removeEventListener('blur',loseFocus);
    socket.off('match:shot',onShot);socket.off('player:respawn',onRespawn);
    if(document.pointerLockElement===dom)document.exitPointerLock?.();
@@ -321,3 +349,4 @@ export default function GameScene({me,enemy,status,socket,serverNow,quality='bal
   {me&&socket&&<PlayerController key={me.id} player={me} status={status} socket={socket} serverNow={serverNow} sensitivity={sensitivity}/>} 
  </Canvas>;
 }
+

@@ -29,6 +29,7 @@ test('browser measures authoritative posture camera heights, speeds and position
  const standing=await sample('지상',null,[4.1,6.4],1.55);
  const sprint=await sample('지상','Shift',[6.0,8.6],1.55);
  const crouched=await sample('앉기','c',[2.0,3.5],.96);
+ await expect(page.getByTestId('stance')).toHaveText('지상');
  await page.keyboard.press('z');
  const prone=await sample('엎드림',null,[.8,1.8],.42);
  for(const result of [standing,sprint,crouched,prone]){
@@ -37,3 +38,4 @@ test('browser measures authoritative posture camera heights, speeds and position
   expect(result.speed).toBeLessThan(result.speedMax);
  }
 });
+
