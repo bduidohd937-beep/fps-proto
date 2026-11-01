@@ -154,7 +154,7 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
  sensitivityRef.current=sensitivity;
  const sendTimer=useRef(0),fireTimer=useRef(0),bob=useRef(0),recoil=useRef(0),telemetry=useRef({x:player.x,y:player.y??0,z:player.z,serverX:player.x,serverY:player.y??0,serverZ:player.z,serverNow:serverNow??0,serverSpeed:0,time:performance.now()});
  const gun=useRef(null),firing=useRef(false),aimHeld=useRef(false),viewAds=useRef(0),running=useRef(false),proneToggle=useRef(false);
- const mouseEvents=useRef(0);
+ const mouseInput=useRef({events:0,x:0,y:0});
  const visibleWeapon=useRef(player.weaponId||DEFAULT_WEAPON_ID);
  running.current=status==='playing'&&player.hp>0;
  useEffect(()=>{
@@ -164,8 +164,12 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   const lock=()=>{if(running.current&&document.pointerLockElement!==dom)dom.requestPointerLock?.();};
   const move=e=>{
    if(document.pointerLockElement!==dom||!running.current)return;
-   mouseEvents.current+=1;
-   dom.dataset.acceptanceMouseEvents=String(mouseEvents.current);
+   mouseInput.current.events+=1;
+   mouseInput.current.x+=e.movementX??0;
+   mouseInput.current.y+=e.movementY??0;
+   dom.dataset.acceptanceMouseEvents=String(mouseInput.current.events);
+   dom.dataset.acceptanceMouseTotalX=String(mouseInput.current.x);
+   dom.dataset.acceptanceMouseTotalY=String(mouseInput.current.y);
    dom.dataset.acceptanceLastMovementX=String(e.movementX??0);
    dom.dataset.acceptanceLastMovementY=String(e.movementY??0);
    const multiplier=sensitivityForAim(sensitivityRef.current,aimHeld.current);
@@ -191,14 +195,14 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   const keyUp=e=>keys.current.delete(e.code);
   const mouseDown=e=>{
    if(document.pointerLockElement!==dom||!running.current)return;
-   if(e.button===2){e.preventDefault();aimHeld.current=true;return;}
+   if(e.button===2){e.preventDefault();aimHeld.current=true;dom.dataset.acceptanceAim='ads';return;}
    if(e.button!==0)return;
    firing.current=true;fireTimer.current=0;
    socket.emit('player:fire');
   };
   const mouseUp=e=>{
    if(e.button===0)firing.current=false;
-   if(e.button===2)aimHeld.current=false;
+   if(e.button===2){aimHeld.current=false;dom.dataset.acceptanceAim='general';}
   };
   const contextMenu=e=>{if(document.pointerLockElement===dom)e.preventDefault();};
   const loseFocus=()=>{keys.current.clear();firing.current=false;aimHeld.current=false;};
@@ -237,6 +241,9 @@ function PlayerController({player,status,socket,serverNow,sensitivity}){
   dom.dataset.inputReady='true';
   dom.dataset.acceptancePointerLock=document.pointerLockElement===dom?'locked':'unlocked';
   dom.dataset.acceptanceMouseEvents='0';
+  dom.dataset.acceptanceMouseTotalX='0';
+  dom.dataset.acceptanceMouseTotalY='0';
+  dom.dataset.acceptanceAim='general';
   return ()=>{
    delete dom.dataset.controllerReady;
    delete dom.dataset.inputReady;
