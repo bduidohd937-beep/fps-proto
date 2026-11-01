@@ -109,7 +109,7 @@ io.on('connection',socket=>{
   player.pitch=clamp(data.pitch,-Math.PI/2+.05,Math.PI/2-.05);
   const ads=data.ads===true&&data.sprint!==true;
   player.ads=ads;
-  player.input={forward:clamp(Number(data.forward)||0,-1,1),strafe:clamp(Number(data.strafe)||0,-1,1),sprint:data.sprint===true&&!ads,jump:data.jump===true,crouch:data.crouch===true};
+  player.input={forward:clamp(Number(data.forward)||0,-1,1),strafe:clamp(Number(data.strafe)||0,-1,1),sprint:data.sprint===true&&!ads&&data.prone!==true&&data.crouch!==true,jump:data.jump===true,crouch:data.crouch===true,prone:data.prone===true};
   player.lastInputAt=Date.now();
  });
  socket.on('player:select-weapon',(id,ack)=>{
@@ -122,7 +122,7 @@ io.on('connection',socket=>{
    player.weaponId=weapon.id;
    player.ammo=player.magazines[weapon.id];
    player.reloadAt=0;player.reloadWeaponId=null;
-   player.ads=false;player.bloom=0;
+   player.ads=false;player.bloom=0;player.recoilShots=0;
    player.switchUntil=Date.now()+260;
    broadcast(room);
   }
@@ -160,16 +160,16 @@ const ticker=setInterval(()=>{
    if(!player.hp&&player.respawnAt&&now>=player.respawnAt){
     const spawn=SPAWNS[room.players.indexOf(player)];
     const magazines=createMagazines(),weapon=getWeapon(player.weaponId)??getWeapon(DEFAULT_WEAPON_ID);
-    Object.assign(player,{x:spawn.x,y:spawn.y,z:spawn.z,vy:0,grounded:true,crouch:false,jumpHeld:false,yaw:spawn.yaw,pitch:0,
-      hp:MAX_HP,magazines,ammo:magazines[weapon.id],weaponId:weapon.id,ads:false,bloom:0,switchUntil:0,reloadWeaponId:null,
-      respawnAt:0,reloadAt:0,input:{forward:0,strafe:0,sprint:false,jump:false,crouch:false}});
+    Object.assign(player,{x:spawn.x,y:spawn.y,z:spawn.z,vy:0,grounded:true,crouch:false,prone:false,jumpHeld:false,yaw:spawn.yaw,pitch:0,
+      hp:MAX_HP,magazines,ammo:magazines[weapon.id],weaponId:weapon.id,ads:false,bloom:0,recoilShots:0,switchUntil:0,reloadWeaponId:null,
+      respawnAt:0,reloadAt:0,input:{forward:0,strafe:0,sprint:false,jump:false,crouch:false,prone:false}});
     if(player.bot){room.botBrain=createBotBrain(now);}
     else io.to(player.id).emit('player:respawn',{x:spawn.x,y:spawn.y,z:spawn.z,yaw:spawn.yaw});
    }
    if(player.hp>0&&!player.bot){
     player.bloom=Math.max(0,player.bloom-dt*.85);
     const fresh=now-player.lastInputAt<300;
-    const input=fresh?player.input:{forward:0,strafe:0,sprint:false,jump:false,crouch:player.input.crouch};
+    const input=fresh?player.input:{forward:0,strafe:0,sprint:false,jump:false,crouch:player.input.crouch,prone:player.input.prone};
     Object.assign(player,movePlayer3D(player,{...input,yaw:player.yaw},dt));
    }
   }
@@ -190,4 +190,4 @@ server.on('error',error=>{
  console.error('PROJECT DUEL server startup failed:',error.code||error.message);
  process.exitCode=1;
 });
-server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL FRONTLINE V0.3.0 game server on port '+PORT));
+server.listen(PORT,'0.0.0.0',()=>console.log('PROJECT DUEL FRONTLINE V0.3.1 game server on port '+PORT));

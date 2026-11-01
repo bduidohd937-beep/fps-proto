@@ -1,4 +1,4 @@
-import {movePlayer3D,PLAYER_EYE,CROUCH_EYE,WORLD_BOXES,aimDirection,rayBox} from '../../shared/rules.js';
+import {movePlayer3D,PLAYER_EYE,CROUCH_EYE,PRONE_EYE,WORLD_BOXES,rayBox} from '../../shared/rules.js';
 import {getWeapon} from '../../shared/weapons.js';
 import {findGroundPath,navigationPointAllowed} from './navigation.js';
 import {applyFire,startReload} from '../domain/combat.js';
@@ -15,8 +15,8 @@ export function createBotBrain(now=Date.now()){
   decisionCount:0};
 }
 export function botLineOfSight(bot,target){
- const fromY=(bot.y??0)+(bot.crouch?CROUCH_EYE:PLAYER_EYE);
- const toY=(target.y??0)+(target.crouch?.65:1.02);
+ const fromY=(bot.y??0)+(bot.prone?PRONE_EYE:bot.crouch?CROUCH_EYE:PLAYER_EYE);
+ const toY=(target.y??0)+(target.prone?.30:target.crouch?.65:1.02);
  const dx=target.x-bot.x,dy=toY-fromY,dz=target.z-bot.z;
  const distance=Math.hypot(dx,dy,dz);
  if(distance<.01||distance>65)return false;
@@ -28,8 +28,8 @@ function facing(bot,target){
  return -Math.atan2(dx,-dz);
 }
 function pitchTo(bot,target){
- const fromY=(bot.y??0)+(bot.crouch?CROUCH_EYE:PLAYER_EYE);
- const aimY=(target.y??0)+(target.crouch?.62:1.05);
+ const fromY=(bot.y??0)+(bot.prone?PRONE_EYE:bot.crouch?CROUCH_EYE:PLAYER_EYE);
+ const aimY=(target.y??0)+(target.prone?.3:target.crouch?.62:1.05);
  return Math.atan2(aimY-fromY,Math.hypot(target.x-bot.x,target.z-bot.z));
 }
 function angleDelta(a,b){return Math.atan2(Math.sin(a-b),Math.cos(a-b));}
@@ -91,7 +91,7 @@ export function decideBot(bot,target,brain,now=Date.now(),random=Math.random,dif
   forward:moving?Math.cos(strafeAngle):0,
   strafe:moving?-Math.sin(strafeAngle):0,
   sprint:brain.mode!=='engage'&&d>15,
-  jump:false,crouch:false
+  jump:false,crouch:false,prone:false
  };
  const angle=locked?pitchTo(bot,target):0;
  const aimJitter=(random()-.5)*tune.aimError;
