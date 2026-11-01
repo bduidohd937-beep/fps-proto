@@ -30,25 +30,28 @@ export default function App(){
  const lastHp=useRef(null);
  useEffect(()=>{
   const socket=io({reconnectionAttempts:10});socketRef.current=socket;
+  let healthController=null;
   socket.on('connect',async ()=>{
    setConnected(false);
    setMessage('PROJECT DUEL 서버 버전을 확인하고 있습니다...');
-   const controller=new AbortController();
+   healthController?.abort();
+   const controller=new AbortController();healthController=controller;
    const timeout=setTimeout(()=>controller.abort(),5000);
    try{
     const response=await fetch('/api/health',{cache:'no-store',signal:controller.signal});
     const info=await response.json();
+    if(controller.signal.aborted||healthController!==controller||!socket.connected)return;
     if(!response.ok||info.service!=='project-duel'||info.protocol!==GAME_PROTOCOL||info.version!==GAME_VERSION){
      setMessage('연결된 서버가 현재 게임 버전과 일치하지 않습니다. 기존 개발 서버를 종료한 후 npm run dev를 다시 실행해 주세요.');
      return;
     }
-    if(!socket.connected)return;
+    if(!socket.connected||controller.signal.aborted)return;
     setConnected(true);setMessage('');
     socket.emit('operator:select',operatorRef.current,reply=>{
      if(reply&&!reply.ok)setMessage(reply.message||'오퍼레이터 선택에 실패했습니다.');
     });
    }catch{
-    if(socket.connected)setMessage('게임 서버 상태 확인에 실패했습니다. 기존 서버를 종료하고 npm run dev를 다시 실행해 주세요.');
+    if(socket.connected&&healthController===controller)setMessage('게임 서버 상태 확인에 실패했습니다. 기존 서버를 종료하고 npm run dev를 다시 실행해 주세요.');
    }finally{
     clearTimeout(timeout);
    }
@@ -58,6 +61,7 @@ export default function App(){
    setMessage('게임 서버에 연결할 수 없습니다. 서버 실행 상태를 확인해 주세요.');
   });
   socket.on('disconnect',()=>{
+   healthController?.abort();healthController=null;
    setConnected(false);setMessage('서버 연결이 끊겼습니다. 재접속 중입니다.');
    setMatch(null);setRoomCode('');setMyId('');setRoomPending('');
   });
@@ -75,7 +79,7 @@ export default function App(){
     window.setTimeout(()=>setHeadshot(false),440);
    }
   });
-  return ()=>{socket.disconnect();socketRef.current=null;};
+  return ()=>{healthController?.abort();healthController=null;socket.disconnect();socketRef.current=null;};
  },[]);
  useEffect(()=>{
   const onDebug=e=>{if(e.code==='F3'){e.preventDefault();setShowDebug(x=>!x);}};

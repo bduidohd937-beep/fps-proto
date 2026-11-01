@@ -9,7 +9,7 @@ export default defineConfig({
  retries:0,
  reporter:'list',
  use:{
-  baseURL:'http://127.0.0.1:5173',
+  baseURL:'http://127.0.0.1:5273',
   trace:'retain-on-failure',
   screenshot:'only-on-failure',
   launchOptions:{args:['--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']}
@@ -17,8 +17,9 @@ export default defineConfig({
  projects:[{name:'chromium',use:{...devices['Desktop Chrome']}}],
  webServer:{
   command:'npm run dev',
-  url:'http://127.0.0.1:5173',
-  reuseExistingServer:!process.env.CI,
+  env:{WEB_PORT:'5273',GAME_PORT:'43271'},
+  url:'http://127.0.0.1:5273/api/health',
+  reuseExistingServer:false,
   timeout:120000
  }
 });

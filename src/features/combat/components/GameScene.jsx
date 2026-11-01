@@ -196,7 +196,7 @@ function PlayerController({player,status,socket}){
    recoil.current=1;
    const kick=getVisualKick(current,event.recoilIndex??0,event.stance??'standing');
    pitch.current=Math.min(1.42,pitch.current+kick.pitch);
-   yaw.current-=kick.yaw;
+   yaw.current+=kick.yaw;
   };
   const onRespawn=data=>{
    yaw.current=data.yaw;pitch.current=0;recoil.current=0;
@@ -215,7 +215,9 @@ function PlayerController({player,status,socket}){
   document.addEventListener('pointerlockchange',pointerChange);
   window.addEventListener('blur',loseFocus);
   socket.on('match:shot',onShot);socket.on('player:respawn',onRespawn);
+  dom.dataset.controllerReady='true';
   return ()=>{
+   delete dom.dataset.controllerReady;
    dom.removeEventListener('click',lock);
    document.removeEventListener('mousemove',move);
    document.removeEventListener('keydown',keyDown);
@@ -297,7 +299,7 @@ function PlayerController({player,status,socket}){
 }
 export default function GameScene({me,enemy,status,socket,quality='balanced'}){
  const preset=resolveQuality(quality);
- return <Canvas shadows={preset.shadows} camera={CAMERA_CONFIG} dpr={preset.dpr}>
+ return <Canvas shadows={preset.shadows} camera={CAMERA_CONFIG} dpr={preset.dpr} frameloop={status==='playing'?'always':'demand'}>
   <FrontlineArena quality={quality}/>
   {enemy&&<Soldier player={enemy}/>}
   {me&&socket&&<PlayerController key={me.id} player={me} status={status} socket={socket}/>}

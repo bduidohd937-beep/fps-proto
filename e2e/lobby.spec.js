@@ -23,6 +23,7 @@ test('browser can create a room and a second client can join',async ({page,brows
   await expect(page.locator('.scoreboard')).toBeVisible();
   // Weapon slot is a real server-side inventory change, not just a visual highlight.
   await expect(page.getByRole('button',{name:'AR-4 장착'})).toHaveClass(/selected/);
+  await expect(page.locator('canvas')).toHaveAttribute('data-controller-ready','true');
   await page.keyboard.press('Digit2');
   await expect(page.getByRole('button',{name:'VXR-9 장착'})).toHaveClass(/selected/);
   await expect(page.locator('.hud-module.ammo')).toContainText('VXR-9');

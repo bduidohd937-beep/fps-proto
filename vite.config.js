@@ -8,7 +8,7 @@ const target = `http://127.0.0.1:${gamePort}`;
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: Number(process.env.WEB_PORT || 5173),
     strictPort: true,
     proxy: {
       '/socket.io': { target, ws: true },
