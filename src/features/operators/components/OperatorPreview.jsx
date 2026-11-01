@@ -97,7 +97,7 @@ function Operative({operatorId}){
 export const OperatorPreview=memo(function OperatorPreview({operatorId,quality='balanced'}){
  const preset=resolveQuality(quality);
  return <div className="operator-preview" aria-label="선택 오퍼레이터 3D 미리보기">
-  <Canvas camera={{position:[2.6,1.6,4.55],fov:39,near:.1,far:30}} dpr={preset.dpr} shadows={false} frameloop="always">
+  <Canvas camera={{position:[2.6,1.65,-4.55],fov:39,near:.1,far:30}} dpr={preset.dpr} shadows={false} frameloop={quality==='low'?'demand':'always'}>
    <color attach="background" args={['#101a1b']}/>
    <fog attach="fog" args={['#101a1b',7,16]}/>
    <ambientLight intensity={1.15}/>
